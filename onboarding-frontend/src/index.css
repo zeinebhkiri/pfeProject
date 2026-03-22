@@ -1,1 +1,227 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
+
+* { font-family: 'DM Sans', sans-serif; }
+h1, h2, h3, h4 { font-family: 'Sora', sans-serif; }
+
+/* ── Brand Colors Square IT Consulting ── */
+:root {
+  --navy:        #1A2B6B;
+  --navy-dark:   #111D4A;
+  --navy-light:  #243580;
+  --cyan:        #00AEEF;
+  --cyan-dark:   #0090C5;
+  --cyan-light:  #33C0F3;
+  --green:       #8DC63F;
+  --green-dark:  #72A030;
+  --blue-soft:   #A8D8EA;
+
+  --sidebar-w: 268px;
+  --sidebar-collapsed: 72px;
+
+  --bg:          #F0F4FA;
+  --surface:     #FFFFFF;
+  --border:      #DDE5F0;
+  --text:        #0D1B3E;
+  --text-muted:  #7A8BB0;
+  --text-light:  #B0BEDB;
+}
+
+.dark {
+  --bg:         #0B1120;
+  --surface:    #111C35;
+  --border:     #1E2D50;
+  --text:       #E8EFFF;
+  --text-muted: #6B7FA8;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* ── Sidebar links ── */
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: all 0.18s;
+  cursor: pointer;
+  color: rgba(168, 216, 234, 0.65);
+  width: 100%;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  letter-spacing: 0.01em;
+}
+.sidebar-link:hover {
+  color: #fff;
+  background: rgba(0, 174, 239, 0.12);
+}
+.sidebar-link.active {
+  color: #fff;
+  background: linear-gradient(90deg, rgba(0,174,239,0.25) 0%, rgba(0,174,239,0.08) 100%);
+  border-left: 3px solid var(--cyan);
+  padding-left: 11px;
+}
+.sidebar-link.active:hover {
+  background: linear-gradient(90deg, rgba(0,174,239,0.32) 0%, rgba(0,174,239,0.12) 100%);
+}
+
+/* ── Cards ── */
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(26,43,107,0.06);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.stat-card:hover {
+  box-shadow: 0 6px 20px rgba(26,43,107,0.1);
+  transform: translateY(-1px);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(26,43,107,0.05);
+}
+
+/* ── Buttons ── */
+.btn-primary {
+  background: linear-gradient(135deg, var(--cyan) 0%, var(--cyan-dark) 100%);
+  color: white;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.18s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0,174,239,0.3);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--cyan-light) 0%, var(--cyan) 100%);
+  box-shadow: 0 4px 14px rgba(0,174,239,0.4);
+  transform: translateY(-1px);
+}
+.btn-primary:active { transform: scale(0.97); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.btn-secondary {
+  background: var(--border);
+  color: var(--text);
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-secondary:hover { opacity: 0.8; }
+.btn-secondary:active { transform: scale(0.97); }
+
+.btn-danger {
+  background: #fef2f2;
+  color: #dc2626;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid #fecaca;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-danger:hover { background: #fee2e2; }
+.btn-danger:active { transform: scale(0.97); }
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-success {
+  background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(141,198,63,0.3);
+}
+.btn-success:hover {
+  box-shadow: 0 4px 14px rgba(141,198,63,0.4);
+  transform: translateY(-1px);
+}
+.btn-success:active { transform: scale(0.97); }
+.btn-success:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* ── Input ── */
+.input-field {
+  width: 100%;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s;
+  font-family: 'DM Sans', sans-serif;
+}
+.input-field:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(0, 174, 239, 0.12);
+  background: var(--surface);
+}
+.input-field::placeholder { color: var(--text-muted); }
+
+/* ── Badge ── */
+.badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ── Animations ── */
+.drawer-overlay { animation: fadeIn 0.2s ease; }
+.drawer-panel   { animation: slideIn 0.25s ease; }
+.modal-panel    { animation: modalIn 0.2s ease; }
+.page-enter     { animation: pageFade 0.35s ease; }
+
+@keyframes fadeIn  { from { opacity: 0; }                          to { opacity: 1; } }
+@keyframes slideIn { from { transform: translateX(100%); }         to { transform: translateX(0); } }
+@keyframes modalIn { from { opacity: 0; transform: scale(0.95); }  to { opacity: 1; transform: scale(1); } }
+@keyframes pageFade{ from { opacity: 0; transform: translateY(8px);} to { opacity: 1; transform: translateY(0); } }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }

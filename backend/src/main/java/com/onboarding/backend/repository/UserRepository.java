@@ -2,6 +2,7 @@ package com.onboarding.backend.repository;
 
 import com.onboarding.backend.model.User;
 import com.onboarding.backend.model.enums.Role;
+import com.onboarding.backend.model.enums.StatutCompte;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
@@ -12,4 +13,5 @@ public interface UserRepository extends MongoRepository<User, String> {
     boolean existsByEmail(String email);
     List<User> findByRole(Role role);                          // ← NOUVEAU
     List<User> findByRoleIn(List<Role> roles);                 // ← NOUVEAU (utile plus tard)
+    List<User> findByStatutCompte(StatutCompte statutCompte);
 }

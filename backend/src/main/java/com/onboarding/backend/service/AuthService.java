@@ -59,6 +59,7 @@ public class AuthService {
         user.setStatutCompte(StatutCompte.EN_ATTENTE);
         user.setProfilCompletion(0);
         user.setDateCreation(LocalDateTime.now());
+        user.setDateLimit(LocalDateTime.now().plusDays(request.getJoursLimite()));
 
         User savedUser = userRepository.save(user);
 
@@ -77,7 +78,8 @@ public class AuthService {
         emailService.sendActivationEmail(
                 savedUser.getEmail(),
                 tokenValue,
-                savedUser.getPrenom() + " " + savedUser.getNom()
+                savedUser.getPrenom() + " " + savedUser.getNom(),
+                savedUser.getDateLimit()  // ← AJOUTER ce paramètre
         );
 
         return "Compte " + request.getRole().name() + " créé. Email d'activation envoyé à " + savedUser.getEmail();
@@ -142,7 +144,7 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("Utilisateur introuvable."));
 
-        if (user.getStatutCompte() != StatutCompte.ACCEPTE) {
+        if (user.getStatutCompte() != StatutCompte.ACCEPTE && user.getStatutCompte() != StatutCompte.VALIDE) {
             throw new RuntimeException("Votre compte n'est pas encore accepté ou a été désactivé.");
         }
 
@@ -159,7 +161,6 @@ public class AuthService {
                 );
 
         String jwt = jwtService.generateToken(extraClaims, userDetails);
-
         return new LoginResponse(jwt, user.getEmail(), user.getRole().name(), user.getId());
     }
 
@@ -197,24 +198,37 @@ public class AuthService {
         System.out.println("Now : " + LocalDateTime.now());
         return info;
     }
-    //methode qui verifie le token chaque 60 sc?
-    @Scheduled(fixedRate = 300000) // toutes les 60 secondes
+
+    //methode qui verifie le token chaque 5 min
+    //ki ma yenzelch 3al mail ba3d 5 h
+    @Scheduled(fixedRate = 300000) // toutes les 5 minutes
     public void expirePendingAccountsAutomatically() {
 
+        // 1. Expirer les tokens d'activation non utilisés
         List<ActivationToken> expiredTokens =
                 tokenRepository.findAllByExpirationDateBeforeAndUsedFalse(LocalDateTime.now());
 
         for (ActivationToken token : expiredTokens) {
-
             User user = userRepository.findById(token.getUserId()).orElse(null);
-
             if (user != null && user.getStatutCompte() == StatutCompte.EN_ATTENTE) {
                 user.setStatutCompte(StatutCompte.EXPIRE);
                 userRepository.save(user);
             }
-
             token.setUsed(true);
             tokenRepository.save(token);
+        }
+
+        // 2. Désactiver les comptes ACCEPTE dont la dateLimit est dépassée
+        //    et dont le profilCompletion < 100
+        List<User> usersToCheck = userRepository.findByStatutCompte(StatutCompte.ACCEPTE);
+        for (User user : usersToCheck) {
+            if (user.getDateLimit() != null
+                    && user.getDateLimit().isBefore(LocalDateTime.now())
+                    && user.getProfilCompletion() < 100) {
+                user.setStatutCompte(StatutCompte.DESACTIVE);
+                userRepository.save(user);
+                System.out.println("Compte désactivé automatiquement : " + user.getEmail());
+            }
         }
     }
 }

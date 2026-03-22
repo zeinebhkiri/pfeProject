@@ -43,6 +43,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         try {
             userEmail = jwtService.extractEmail(jwt);
+            //System.out.println("Email extrait du JWT : " + userEmail);
         } catch (Exception e) {
             // Token expired or invalid → ignore and continue
             filterChain.doFilter(request, response);

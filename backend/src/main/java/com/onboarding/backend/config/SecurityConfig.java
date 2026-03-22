@@ -43,6 +43,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/activate").permitAll()
                         .requestMatchers("/api/auth/token-info").permitAll()
+                        .requestMatchers("/api/auth/forgot-password").permitAll()
+                        .requestMatchers("/api/auth/reset-password").permitAll()
+
 
                         // ── Routes ADMIN (RH) uniquement ───────────────────────────────
                         .requestMatchers("/api/auth/create-employee").hasRole("ADMIN")
@@ -56,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/parcours/**").authenticated()
                         .requestMatchers("/api/tasks/**").authenticated()
                         .requestMatchers("/api/documents/**").authenticated()
+                        .requestMatchers("/api/affectations/**").authenticated()
 
                         // ── Tout le reste nécessite une authentification ─────────────────
                         .anyRequest().authenticated()

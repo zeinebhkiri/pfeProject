@@ -25,7 +25,7 @@ public class DataInitializer {
                 admin.setEmail("admin@test.com");
                 admin.setPassword(passwordEncoder.encode("admin123")); // ✅ encodé automatiquement
                 admin.setRole(Role.ADMIN);
-                admin.setStatutCompte(StatutCompte.ACCEPTE);
+                admin.setStatutCompte(StatutCompte.VALIDE);
                 admin.setNom("Admin");
                 admin.setPrenom("Super");
                 admin.setDateCreation(java.time.LocalDateTime.now());
