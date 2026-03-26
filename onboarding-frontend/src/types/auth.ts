@@ -118,3 +118,127 @@ export interface Position {
   description?: string;
   actif: boolean;
 }
+// ── Parcours ──────────────────────────────────────────────────────────
+
+export type TaskType =
+  | "FORMATION"
+  | "QUIZ"
+  | "DOCUMENT_RH"
+  | "DOCUMENT_SALARIE"
+  | "ENTRETIEN"
+  | "SIMPLE";
+
+export type TypeActeur = "SALARIE" | "MANAGER" | "RH";
+
+export type StatutTask =
+  | "NON_COMMENCE"
+  | "EN_COURS"
+  | "TERMINE"
+  | "REJETE";
+
+export type StatutParcours = "EN_COURS" | "TERMINE" | "EXPIRE";
+
+export interface Question {
+  id: string;
+  texte: string;
+  options: string[];
+  bonneReponse: number;
+  points: number;
+}
+
+export interface TaskConfig {
+  // FORMATION
+  videoUrl?: string;
+  fichierContenu?: string;
+  fichierNom?: string;
+  fichierMimeType?: string;
+  // QUIZ
+  questions?: Question[];
+  scoreMinimum?: number;
+  // DOCUMENT_RH
+  documentContenu?: string;
+  documentNom?: string;
+  documentMimeType?: string;
+  // DOCUMENT_SALARIE
+  typeDocumentAttendu?: string;
+  // ENTRETIEN
+  dureeMinutes?: number;
+  lieu?: string;
+  notesEntretien?: string;
+  // SIMPLE
+  datePlanifiee?: string;
+}
+
+export interface TaskTemplate {
+  id: string;
+  parcoursTemplateId: string;
+  titre: string;
+  description?: string;
+  taskType: TaskType;
+  typeActeur: TypeActeur;
+  ordre: number;
+  obligatoire: boolean;
+  delaiJours: number;
+  config?: TaskConfig;
+}
+
+export interface ParcoursTemplate {
+  id: string;
+  titre: string;
+  description?: string;
+  positionId: string;
+  actif: boolean;
+}
+
+export interface TaskCommentaire {
+  auteurId: string;
+  auteurNom: string;
+  texte: string;
+  date: string;
+}
+
+export interface Task {
+  id: string;
+  parcoursId: string;
+  taskTemplateId: string;
+  titre: string;
+  description?: string;
+  taskType: TaskType;
+  typeActeur: TypeActeur;
+  acteurId?: string;
+  ordre: number;
+  obligatoire: boolean;
+  verrouille: boolean;
+  statut: StatutTask;
+  echeance?: string;
+  dateCompletion?: string;
+  scoreObtenu?: number;
+  nbTentatives: number;
+  progression: number;
+  reponsesQuiz?: number[];
+  documentContenu?: string;
+  documentNom?: string;
+  documentMimeType?: string;
+  commentaires: TaskCommentaire[];
+  config?: TaskConfig;
+  dateEntretien?: string;
+  documentEntretienContenu?: string;
+  documentEntretienNom?: string;
+  documentEntretienMimeType?: string;
+}
+
+export interface Parcours {
+  id: string;
+  userId: string;
+  positionId: string;
+  parcoursTemplateId: string;
+  statut: StatutParcours;
+  dateDebut: string;
+  dateFin?: string;
+  progression: number;
+}
+
+export interface ParcoursAvecTasks {
+  parcours: Parcours;
+  tasks: Task[];
+}

@@ -11,6 +11,11 @@ import {
   type UserDocument,
   type CompanyDocument,
   type Position,
+    type ParcoursTemplate,
+  type TaskTemplate,
+  type Parcours,
+  type Task,
+  type ParcoursAvecTasks,
 } from "../types/auth";
 import { type Affectation } from "../types/auth";
 
@@ -232,4 +237,184 @@ export const updatePositionApi = async (id: string, data: { titre: string; descr
 
 export const deletePositionApi = async (id: string): Promise<void> => {
   await api.delete(`/positions/${id}`);
+};
+export const getParcoursTemplatesApi = async (): Promise<ParcoursTemplate[]> => {
+  const res = await api.get<ParcoursTemplate[]>("/parcours-templates");
+  return res.data;
+};
+
+export const getParcoursTemplateByPositionApi = async (
+  positionId: string
+): Promise<ParcoursTemplate> => {
+  const res = await api.get<ParcoursTemplate>(
+    `/parcours-templates/position/${positionId}`
+  );
+  return res.data;
+};
+
+export const createParcoursTemplateApi = async (data: {
+  titre: string;
+  description: string;
+  positionId: string;
+}): Promise<ParcoursTemplate> => {
+  const res = await api.post<ParcoursTemplate>("/parcours-templates", data);
+  return res.data;
+};
+
+export const updateParcoursTemplateApi = async (
+  id: string,
+  data: { titre: string; description: string }
+): Promise<ParcoursTemplate> => {
+  const res = await api.put<ParcoursTemplate>(`/parcours-templates/${id}`, data);
+  return res.data;
+};
+
+export const deleteParcoursTemplateApi = async (id: string): Promise<void> => {
+  await api.delete(`/parcours-templates/${id}`);
+};
+
+// ── Task Templates ────────────────────────────────────────────────────
+
+export const getTaskTemplatesApi = async (
+  parcoursTemplateId: string
+): Promise<TaskTemplate[]> => {
+  const res = await api.get<TaskTemplate[]>(
+    `/parcours-templates/${parcoursTemplateId}/tasks`
+  );
+  return res.data;
+};
+
+export const createTaskTemplateApi = async (
+  parcoursTemplateId: string,
+  data: Partial<TaskTemplate>
+): Promise<TaskTemplate> => {
+  const res = await api.post<TaskTemplate>(
+    `/parcours-templates/${parcoursTemplateId}/tasks`,
+    data
+  );
+  return res.data;
+};
+
+export const updateTaskTemplateApi = async (
+  parcoursTemplateId: string,
+  taskId: string,
+  data: Partial<TaskTemplate>
+): Promise<TaskTemplate> => {
+  const res = await api.put<TaskTemplate>(
+    `/parcours-templates/${parcoursTemplateId}/tasks/${taskId}`,
+    data
+  );
+  return res.data;
+};
+
+export const deleteTaskTemplateApi = async (
+  parcoursTemplateId: string,
+  taskId: string
+): Promise<void> => {
+  await api.delete(`/parcours-templates/${parcoursTemplateId}/tasks/${taskId}`);
+};
+
+export const reorderTaskTemplatesApi = async (
+  parcoursTemplateId: string,
+  orders: { taskId: string; ordre: number }[]
+): Promise<void> => {
+  await api.put(
+    `/parcours-templates/${parcoursTemplateId}/tasks/reorder`,
+    orders
+  );
+};
+
+// ── Parcours ──────────────────────────────────────────────────────────
+
+export const getMyParcoursApi = async (): Promise<Parcours> => {
+  const res = await api.get<Parcours>("/parcours/me");
+  return res.data;
+};
+
+export const getMyTasksApi = async (): Promise<Task[]> => {
+  const res = await api.get<Task[]>("/parcours/me/tasks");
+  return res.data;
+};
+
+export const getParcoursOfUserApi = async (
+  userId: string
+): Promise<ParcoursAvecTasks> => {
+  const res = await api.get<ParcoursAvecTasks>(`/parcours/user/${userId}`);
+  return res.data;
+};
+
+export const getAllParcoursApi = async (): Promise<Parcours[]> => {
+  const res = await api.get<Parcours[]>("/parcours");
+  return res.data;
+};
+
+export const getTeamParcoursApi = async (): Promise<any[]> => {
+  const res = await api.get<any[]>("/parcours/my-team");
+  return res.data;
+};
+
+// ── Tasks ─────────────────────────────────────────────────────────────
+
+export const startTaskApi = async (taskId: string): Promise<Task> => {
+  const res = await api.put<Task>(`/tasks/${taskId}/start`);
+  return res.data;
+};
+
+export const submitQuizApi = async (
+  taskId: string,
+  reponses: number[]
+): Promise<Task> => {
+  const res = await api.put<Task>(`/tasks/${taskId}/submit-quiz`, { reponses });
+  return res.data;
+};
+
+export const submitDocumentTaskApi = async (
+  taskId: string,
+  data: { contenu: string; nom: string; mimeType: string }
+): Promise<Task> => {
+  const res = await api.put<Task>(`/tasks/${taskId}/submit-document`, data);
+  return res.data;
+};
+
+export const validateTaskApi = async (
+  taskId: string,
+  data: {
+    approuve: boolean;
+    commentaire?: string;
+    auteurId: string;
+    auteurNom: string;
+  }
+): Promise<Task> => {
+  const res = await api.put<Task>(`/tasks/${taskId}/validate`, data);
+  return res.data;
+};
+
+export const completeTaskApi = async (taskId: string): Promise<Task> => {
+  const res = await api.put<Task>(`/tasks/${taskId}/complete`);
+  return res.data;
+};
+
+export const addCommentTaskApi = async (
+  taskId: string,
+  data: { auteurId: string; auteurNom: string; texte: string }
+): Promise<Task> => {
+  const res = await api.post<Task>(`/tasks/${taskId}/comments`, data);
+  return res.data;
+};
+
+export const getAssignedTasksApi = async (): Promise<Task[]> => {
+  const res = await api.get<Task[]>("/tasks/assigned");
+  return res.data;
+};
+export const planifierEntretienApi = async (
+  taskId: string,
+  data: {
+    dateEntretien: string;
+    documentContenu?: string;
+    documentNom?: string;
+    documentMimeType?: string;
+  }
+): Promise<Task> => {
+  const res = await api.put<Task>(`/tasks/${taskId}/planifier-entretien`, data);
+  return res.data;
 };

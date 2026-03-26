@@ -8,6 +8,7 @@ import com.onboarding.backend.repository.AffectationRepository;
 import com.onboarding.backend.repository.PositionRepository;
 import com.onboarding.backend.repository.UserRepository;
 import com.onboarding.backend.service.EmailService;
+import com.onboarding.backend.service.ParcoursService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +27,7 @@ public class AffectationController {
     private final UserRepository userRepository;
     private final PositionRepository positionRepository;
     private final EmailService emailService;
-
+    private final ParcoursService parcoursService;
     // ── Créer ou modifier une affectation ───────────────────────────────────
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -56,7 +57,15 @@ public class AffectationController {
         affectation.setManagerId(request.getManagerId());
         affectation.setDateAffectation(LocalDateTime.now());
         Affectation saved = affectationRepository.save(affectation);
-
+        try {
+            parcoursService.genererParcours(
+                    request.getUserId(),
+                    request.getPositionId(),
+                    request.getManagerId()
+            );
+        } catch (Exception e) {
+            System.out.println("Parcours non généré : " + e.getMessage());
+        }
         // Envoyer email de bienvenue
         try {
             String managerNom = null;

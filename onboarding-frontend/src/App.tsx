@@ -21,7 +21,9 @@ import AdminDocumentsPage from "./pages/AdminDocumentsPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AdminPostesPage from "./pages/AdminPostesPage";
-
+import AdminParcoursTemplatesPage from "./pages/AdminParcoursTemplatesPage";
+import MonParcoursPage from "./pages/MonParcoursPage";
+import ManagerParcoursPage from "./pages/ManagerParcoursPage";
 const queryClient = new QueryClient();
 
 function App() {
@@ -38,6 +40,7 @@ function App() {
           {/* Salarié */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilPage /></ProtectedRoute>} />
+          <Route path="/parcours" element={<ProtectedRoute><MonParcoursPage /></ProtectedRoute>} />
 
           {/* Admin */}
           <Route path="/admin" element={<ProtectedAdminRoute><AdminDashboardPage /></ProtectedAdminRoute>} />
@@ -48,12 +51,14 @@ function App() {
           <Route path="/admin/salarie/:id" element={<ProtectedAdminRoute><SalarieProfilePage /></ProtectedAdminRoute>} />
           <Route path="/admin/documents" element={<ProtectedAdminRoute><AdminDocumentsPage /></ProtectedAdminRoute>} />
           <Route path="/admin/postes" element={<ProtectedAdminRoute><AdminPostesPage /></ProtectedAdminRoute>} />
+          <Route path="/admin/parcours" element={<ProtectedAdminRoute><AdminParcoursTemplatesPage /></ProtectedAdminRoute>} />
 
           {/* Manager */}
           <Route path="/manager" element={<ProtectedManagerRoute><ManagerDashboardPage /></ProtectedManagerRoute>} />
           <Route path="/manager/equipe" element={<ProtectedManagerRoute><ManagerSalariesPage /></ProtectedManagerRoute>} />
           <Route path="/manager/analytics" element={<ProtectedManagerRoute><ManagerAnalyticsPage /></ProtectedManagerRoute>} />
           <Route path="/manager/salarie/:id" element={<ProtectedManagerRoute><ManagerSalarieProfilePage /></ProtectedManagerRoute>} />
+          <Route path="/manager/parcours" element={<ProtectedManagerRoute><ManagerParcoursPage /></ProtectedManagerRoute>} />
 
           {/* Redirections */}
           <Route path="/" element={<Navigate to="/login" replace />} />
