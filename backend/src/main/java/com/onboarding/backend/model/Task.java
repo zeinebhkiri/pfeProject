@@ -24,8 +24,8 @@ public class Task {
     private String titre;
     private String description;
     private TaskType taskType;
-    private TypeActeur typeActeur;
-    private String acteurId;  // userId du manager/RH assigné
+    private List<TypeActeur> typeActeurs;
+    private List<String> acteurIds;  // userId du manager/RH assigné
 
     private int ordre;
     private boolean obligatoire;
@@ -50,6 +50,9 @@ public class Task {
     // Commentaires
     private List<Commentaire> commentaires = new ArrayList<>();
 
+    //A task is only TERMINE when all actors have done their part
+    private List<ActeurProgression> acteurProgressions;
+    private LocalDateTime dateOuverture;
     // Config copiée du template
     private TaskTemplate.TaskConfig config;
     // Dans Task.java — nouveaux champs pour l'entretien
@@ -71,5 +74,14 @@ public class Task {
         private String auteurNom;
         private String texte;
         private LocalDateTime date;
+    }
+
+    @Data
+    @NoArgsConstructor
+    public static class ActeurProgression {
+        private TypeActeur typeActeur;
+        private String acteurId;
+        private boolean complete;
+        private LocalDateTime dateCompletion;
     }
 }

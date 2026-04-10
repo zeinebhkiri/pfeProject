@@ -45,7 +45,7 @@ const emptyTask = (): Partial<TaskTemplate> => ({
   titre: "",
   description: "",
   taskType: "SIMPLE",
-  typeActeur: "SALARIE",
+  typeActeurs: ["SALARIE"],
   obligatoire: true,
   delaiJours: 0,
   config: {},
@@ -166,6 +166,11 @@ const AdminParcoursTemplatesPage = () => {
     },
   });
 
+  const getActeursLabel = (typeActeurs?: TypeActeur[]) => {
+  if (!typeActeurs || typeActeurs.length === 0) return "Aucun acteur";
+  return typeActeurs.map(a => `${ACTEUR_CONFIG[a]?.icon} ${ACTEUR_CONFIG[a]?.label}`).join(" / ");
+};
+
   // ── Helpers modals ────────────────────────────────────────────────
   const openCreateTemplate = () => {
     setEditingTemplate(null);
@@ -219,7 +224,8 @@ const AdminParcoursTemplatesPage = () => {
 
   const openEditTask = (t: TaskTemplate) => {
     setEditingTask(t);
-    setTaskForm({ ...t });
+    setTaskForm({ ...t ,
+    typeActeurs: t.typeActeurs || ["SALARIE"] });
     setErrorMsg("");
     setShowTaskModal(true);
   };
@@ -236,6 +242,10 @@ const AdminParcoursTemplatesPage = () => {
       setErrorMsg("Le titre est obligatoire.");
       return;
     }
+    if (!taskForm.typeActeurs || taskForm.typeActeurs.length === 0) {
+    setErrorMsg("Veuillez sélectionner au moins un acteur responsable.");
+    return;
+  }
     if (!selectedTemplate) return;
 
     if (editingTask) {
@@ -515,7 +525,7 @@ const AdminParcoursTemplatesPage = () => {
                   <div className="space-y-2">
                     {(tasks as TaskTemplate[]).map((task, index) => {
                       const typeConf = TASK_TYPE_CONFIG[task.taskType];
-                      const acteurConf = ACTEUR_CONFIG[task.typeActeur];
+                      const acteurConf = ACTEUR_CONFIG[task.typeActeurs.includes("SALARIE") ? "SALARIE" : task.typeActeurs.includes("MANAGER") ? "MANAGER" : "RH" ];
                       const isDragging = dragIndex === index;
                       const isDragOver = dragOverIndex === index;
                       const isEntretien = task.taskType === "ENTRETIEN";
@@ -580,12 +590,17 @@ const AdminParcoursTemplatesPage = () => {
                                 style={{ background: typeConf.bg, color: typeConf.color }}>
                                 {typeConf.icon} {typeConf.label}
                               </span>
-                              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                                {acteurConf.icon} {acteurConf.label}
-                              </span>
-                              {task.delaiJours > 0 && (
+<span className="text-xs" style={{ color: "var(--text-muted)" }}>
+  {getActeursLabel(task.typeActeurs)}
+</span>
+                              {task.delaiJours > 0  && (
                                 <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                                   ⏱ J+{task.delaiJours}
+                                </span>
+                              )}
+                               {  task.delaiJours < 0 && (
+                                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                                  ⏱ J{task.delaiJours}
                                 </span>
                               )}
                               {task.taskType === "QUIZ" && task.config?.scoreMinimum && (
@@ -775,28 +790,52 @@ const AdminParcoursTemplatesPage = () => {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold mb-2 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                      Acteur responsable
-                    </label>
-                    <div className="space-y-2">
-                      {(Object.entries(ACTEUR_CONFIG) as [TypeActeur, any][]).map(([type, conf]) => (
-                        <label key={type} className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition"
-                          style={{
-                            background: taskForm.typeActeur === type ? "rgba(0,174,239,0.06)" : "var(--bg)",
-                            border: `1px solid ${taskForm.typeActeur === type ? "rgba(0,174,239,0.3)" : "var(--border)"}`,
-                          }}>
-                          <input type="radio" value={type}
-                            checked={taskForm.typeActeur === type}
-                            onChange={() => setTaskForm(p => ({ ...p, typeActeur: type }))}
-                            style={{ accentColor: "#00AEEF" }} />
-                          <span className="text-sm">{conf.icon} {conf.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+<div className="space-y-3">
+  <div>
+    <label className="block text-xs font-bold mb-2 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+      Acteurs responsables <span className="text-blue-400">(plusieurs choix possibles)</span>
+    </label>
+    <div className="space-y-2">
+      {(Object.entries(ACTEUR_CONFIG) as [TypeActeur, any][]).map(([type, conf]) => {
+        const isChecked = taskForm.typeActeurs?.includes(type) || false;
+        
+        return (
+          <label key={type} className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition group"
+            style={{
+              background: isChecked ? "rgba(0,174,239,0.06)" : "var(--bg)",
+              border: `1px solid ${isChecked ? "rgba(0,174,239,0.3)" : "var(--border)"}`,
+            }}>
+            <input 
+              type="checkbox" 
+              checked={isChecked}
+              onChange={() => {
+                if (isChecked) {
+                  setTaskForm(prev => ({
+                    ...prev,
+                    typeActeurs: (prev.typeActeurs || []).filter(t => t !== type)
+                  }));
+                } else {
+                  setTaskForm(prev => ({
+                    ...prev,
+                    typeActeurs: [...(prev.typeActeurs || []), type]
+                  }));
+                }
+              }}
+              className="w-4 h-4 rounded transition"
+              style={{ accentColor: "#00AEEF" }}
+            />
+            <span className="text-sm flex-1">{conf.icon} {conf.label}</span>
+            {isChecked && (
+              <span className="text-xs px-2 py-1 rounded-full" style={{ background: "#00AEEF", color: "white" }}>
+                ✓
+              </span>
+            )}
+          </label>
+        );
+      })}
+    </div>
+  </div>
+</div>
               </div>
 
               {/* Délai + Obligatoire */}
@@ -805,7 +844,7 @@ const AdminParcoursTemplatesPage = () => {
                   <label className="block text-xs font-bold mb-2 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
                     Délai (jours depuis début)
                   </label>
-                  <input type="number" min={0}
+                  <input type="number" min={-7}
                     value={taskForm.delaiJours || 0}
                     onChange={(e) => setTaskForm(p => ({ ...p, delaiJours: parseInt(e.target.value) || 0 }))}
                     className="input-field" />

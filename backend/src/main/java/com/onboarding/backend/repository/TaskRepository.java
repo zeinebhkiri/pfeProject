@@ -6,6 +6,8 @@ import java.util.List;
 
 public interface TaskRepository extends MongoRepository<Task, String> {
     List<Task> findByParcoursIdOrderByOrdreAsc(String parcoursId);
-    List<Task> findByActeurIdOrderByOrdreAsc(String acteurId);
-    List<Task> findByParcoursIdAndActeurId(String parcoursId, String acteurId);
+
+    List<Task> findByActeurIdsContainingOrderByOrdreAsc(String acteurId);
+
+    List<Task> findByParcoursIdAndActeurIdsContaining(String parcoursId, String acteurId);
 }

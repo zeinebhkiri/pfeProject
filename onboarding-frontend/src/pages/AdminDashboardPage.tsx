@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { createEmployeeApi, disableUserApi, getAllUsersApi, validateUserApi } from "../api/authApi";
+import { createEmployeeApi, disableUserApi, getAllAffectationsApi, getAllUsersApi, getPositionsApi, validateUserApi } from "../api/authApi";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../context/ThemeContext";
-import { type UserRole, type User } from "../types/auth";
+import { type UserRole, type User , type Affectation, type Position} from "../types/auth";
 import Sidebar from "../components/Sidebar";
 
 const statutConfig: Record<string, { label: string; class: string }> = {
@@ -27,6 +27,7 @@ const AdminDashboardPage = () => {
   const { isDark, toggleTheme } = useTheme();
   const queryClient = useQueryClient();
 
+  const [dateEmbauche, setDateEmbauche] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
@@ -39,6 +40,8 @@ const AdminDashboardPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState<string>("ALL");
   const [filterStatut, setFilterStatut] = useState<string>("ALL");
+
+  const [showDisabled, setShowDisabled] = useState(false);
 
   // Toast après validation
   const [toast, setToast] = useState<ToastData | null>(null);
@@ -55,7 +58,7 @@ const [userToDisable, setUserToDisable] = useState<User | null>(null);
       setSuccessMessage(message);
       setErrorMessage("");
       setNom(""); setPrenom(""); setEmployeeEmail("");
-      setRole("SALARIE"); setJoursLimite(3);
+      setRole("SALARIE"); setJoursLimite(3);setDateEmbauche("");
       setShowForm(false);
       queryClient.invalidateQueries({ queryKey: ["allUsers"] });
     },
@@ -93,8 +96,34 @@ const disableMutation = useMutation({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSuccessMessage(""); setErrorMessage("");
-    createMutation.mutate({ nom, prenom, email: employeeEmail, role, joursLimite });
+    createMutation.mutate({
+      nom, prenom, email: employeeEmail, role, joursLimite,
+      dateEmbauche: dateEmbauche
+    });
   };
+
+  const handleRefresh = () => {
+  setSuccessMessage("");
+  setErrorMessage("");
+  queryClient.invalidateQueries({ queryKey: ["allUsers"] });
+  setSearchQuery("");
+  setFilterRole("ALL");
+  setFilterStatut("ALL");
+  setSuccessMessage("Tableau actualisé !");
+  setTimeout(() => setSuccessMessage(""), 3000);
+};
+
+// 2. Ajouter les requêtes pour récupérer les affectations et positions
+const { data: affectations = [] } = useQuery({
+  queryKey: ["affectations"],
+  queryFn: getAllAffectationsApi, // À créer dans authApi
+  enabled: !!users, // ou true si accessible
+});
+
+const { data: positions = [] } = useQuery({
+  queryKey: ["positions"],
+  queryFn: getPositionsApi,
+});
 
   const employees = useMemo(
     () => (users ?? []).filter((u: User) => u.role !== "ADMIN"),
@@ -106,6 +135,8 @@ const disableMutation = useMutation({
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((u: User) => {
+    // ⭐ Exclure les comptes désactivés si showDisabled est false
+    if (!showDisabled && u.statutCompte === "DESACTIVE") return false;
       const fullName = `${u.prenom} ${u.nom}`.toLowerCase();
       const fullNameReverse = `${u.nom} ${u.prenom}`.toLowerCase();
       const q = searchQuery.toLowerCase().trim();
@@ -119,7 +150,7 @@ const disableMutation = useMutation({
       const matchStatut = filterStatut === "ALL" || u.statutCompte === filterStatut;
       return matchSearch && matchRole && matchStatut;
     });
-  }, [employees, searchQuery, filterRole, filterStatut]);
+  }, [employees, searchQuery, filterRole, filterStatut,showDisabled]);
 
   const stats = [
     { label: "Salariés", value: salaries.length, icon: "👤", color: "text-indigo-600", bg: "bg-indigo-50" },
@@ -244,154 +275,194 @@ const disableMutation = useMutation({
           </div>
 
           {/* Table */}
-          <div className="card overflow-hidden">
-            <div className="px-6 py-5 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)" }}>
-              <h2 className="text-base font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>
-                Liste des employés
-              </h2>
-              <div className="flex items-center gap-3">
-                <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)}
-                  className="input-field" style={{ width: "150px", padding: "8px 12px" }}>
-                  <option value="ALL">Tous les rôles</option>
-                  <option value="SALARIE">Salarié</option>
-                  <option value="MANAGER">Manager</option>
-                </select>
-                <select value={filterStatut} onChange={(e) => setFilterStatut(e.target.value)}
-                  className="input-field" style={{ width: "160px", padding: "8px 12px" }}>
-                  <option value="ALL">Tous les statuts</option>
-                  <option value="EN_ATTENTE">En attente</option>
-                  <option value="ACCEPTE">Profil soumis</option>
-                  <option value="VALIDE">Validé</option>
-                  <option value="DESACTIVE">Désactivé</option>
-                  <option value="EXPIRE">Expiré</option>
-                </select>
-              </div>
-            </div>
-
-            {isLoading ? (
-              <div className="flex items-center justify-center h-40" style={{ color: "var(--text-muted)" }}>Chargement...</div>
-            ) : filteredEmployees.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40" style={{ color: "var(--text-muted)" }}>
-                <span className="text-4xl mb-2">🔍</span>
-                <span className="text-sm">Aucun résultat trouvé</span>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                      {["Employé", "Rôle", "Statut", "Progression", "Délai", "Actions"].map((h) => (
-                        <th key={h} className="px-6 pb-4 pt-4 text-left text-xs font-semibold uppercase tracking-wide"
-                          style={{ color: "var(--text-muted)" }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredEmployees.map((user: User) => {
-                      const joursRestants = user.dateLimit
-                        ? Math.ceil((new Date(user.dateLimit).getTime() - Date.now()) / 86400000)
-                        : null;
-                      const statut = statutConfig[user.statutCompte] ?? { label: user.statutCompte, class: "bg-slate-100 text-slate-500" };
-                      const canValidate = user.statutCompte === "ACCEPTE" && user.profilCompletion === 100;
-
-                      return (
-                        <tr key={user.id} className="transition" style={{ borderBottom: "1px solid var(--border)" }}>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                                {user.prenom[0]}{user.nom[0]}
-                              </div>
-                              <div>
-                                <p className="font-semibold" style={{ color: "var(--text)" }}>{user.prenom} {user.nom}</p>
-                                <p className="text-xs" style={{ color: "var(--text-muted)" }}>{user.email}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`badge ${user.role === "MANAGER"
-                              ? "bg-purple-50 text-purple-700 border border-purple-200"
-                              : "bg-slate-100 text-slate-600 border border-slate-200"}`}>
-                              {user.role}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`badge ${statut.class}`}>{statut.label}</span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2" style={{ minWidth: "90px" }}>
-                              <div className="flex-1 rounded-full h-2" style={{ background: "var(--border)" }}>
-                                <div
-                                  className={`h-2 rounded-full transition-all ${user.profilCompletion === 100 ? "bg-emerald-500" : "bg-indigo-500"}`}
-                                  style={{ width: `${user.profilCompletion}%` }}
-                                />
-                              </div>
-                              <span className="text-xs font-medium" style={{ color: "var(--text-muted)", width: "36px", textAlign: "right" }}>
-                                {user.profilCompletion}%
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            {joursRestants !== null ? (
-                              <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${
-                                joursRestants <= 0 ? "bg-red-50 text-red-500"
-                                : joursRestants <= 1 ? "bg-orange-50 text-orange-500"
-                                : "bg-slate-100 text-slate-500"}`}>
-                                {joursRestants <= 0 ? "Expiré" : `J-${joursRestants}`}
-                              </span>
-                            ) : <span style={{ color: "var(--text-muted)" }} className="text-xs">—</span>}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => navigate(`/admin/salarie/${user.id}`)}
-                                className="btn-secondary text-xs px-3 py-2"
-                              >
-                                Voir →
-                              </button>
-                              {canValidate && (
-                                <button
-                                  onClick={() => validateMutation.mutate(user.id)}
-                                  disabled={validateMutation.isPending}
-                                  className="text-xs px-3 py-2 rounded-xl font-semibold transition"
-                                  style={{ background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" }}
-                                >
-                                  ✅ Valider
-                                </button>
-                              )}
-                                {/* Bouton désactiver - visible pour les comptes actifs (non déjà désactivés) */}
-    {user.statutCompte !== "DESACTIVE" && user.statutCompte !== "EXPIRE" && (
-      <button
-        onClick={() => {
-          setUserToDisable(user);
-          setShowDisableModal(true);
-        }}
-        disabled={disableMutation.isPending}
-        className="text-xs px-3 py-2 rounded-xl font-semibold transition"
-        style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}
-        title="Désactiver le compte"
-      >
-        🔒 Désactiver
-      </button>
-    )}
+<div className="card overflow-hidden">
+  <div className="px-6 py-5 flex items-center justify-between flex-wrap gap-3" style={{ borderBottom: "1px solid var(--border)" }}>
+    <h2 className="text-base font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>
+      Liste des employés
+    </h2>
     
-    {/* Badge pour les comptes déjà désactivés */}
-    {user.statutCompte === "DESACTIVE" && (
-      <span className="text-xs px-3 py-2 rounded-xl bg-slate-100 text-slate-500 border border-slate-200">
-        Désactivé
-      </span>
-    )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+    <div className="flex items-center gap-3 flex-wrap">
+      {/* Bouton Actualiser */}
+      <button
+        onClick={handleRefresh}
+        className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:scale-105"
+        style={{ background: "var(--border)", color: "var(--text)" }}
+        title="Actualiser le tableau"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M23 4v6h-6" />
+          <path d="M1 20v-6h6" />
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+          <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+        </svg>
+      </button>
+
+      {/* Filtre Rôle */}
+      <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)}
+        className="input-field" style={{ width: "150px", padding: "8px 12px" }}>
+        <option value="ALL">Tous les rôles</option>
+        <option value="SALARIE">Salarié</option>
+        <option value="MANAGER">Manager</option>
+      </select>
+      
+      {/* Filtre Statut */}
+      <select value={filterStatut} onChange={(e) => setFilterStatut(e.target.value)}
+        className="input-field" style={{ width: "160px", padding: "8px 12px" }}>
+        <option value="ALL">Tous les statuts</option>
+        <option value="EN_ATTENTE">En attente</option>
+        <option value="ACCEPTE">Profil soumis</option>
+        <option value="VALIDE">Validé</option>
+        <option value="DESACTIVE">Désactivé</option>
+        <option value="EXPIRE">Expiré</option>
+      </select>
+    </div>
+  </div>
+
+  {isLoading ? (
+    <div className="flex items-center justify-center h-40" style={{ color: "var(--text-muted)" }}>Chargement...</div>
+  ) : filteredEmployees.length === 0 ? (
+    <div className="flex flex-col items-center justify-center h-40" style={{ color: "var(--text-muted)" }}>
+      <span className="text-4xl mb-2">🔍</span>
+      <span className="text-sm">Aucun résultat trouvé</span>
+    </div>
+  ) : (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr style={{ borderBottom: "1px solid var(--border)" }}>
+            {["Employé", "Rôle", "Statut", "Progression", "Délai", "Poste", "Actions"].map((h) => (
+              <th key={h} className="px-6 pb-4 pt-4 text-left text-xs font-semibold uppercase tracking-wide"
+                style={{ color: "var(--text-muted)" }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {filteredEmployees.map((user: User) => {
+            const joursRestants = user.dateLimit
+              ? Math.ceil((new Date(user.dateLimit).getTime() - Date.now()) / 86400000)
+              : null;
+            const statut = statutConfig[user.statutCompte] ?? { label: user.statutCompte, class: "bg-slate-100 text-slate-500" };
+            const canValidate = user.statutCompte === "ACCEPTE" && user.profilCompletion === 100;
+            
+            // ⭐ Récupérer l'affectation et le poste du salarié
+            const userAffectation = affectations && Array.isArray(affectations) 
+  ? affectations.find((a: Affectation) => a && a.userId === user.id)
+  : null;
+            const userPoste = userAffectation 
+              ? positions?.find((p: Position) => p.id === userAffectation.positionId)?.titre 
+              : null;
+
+            return (
+              <tr key={user.id} className="transition" style={{ borderBottom: "1px solid var(--border)" }}>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                      {user.prenom[0]}{user.nom[0]}
+                    </div>
+                    <div>
+                      <p className="font-semibold" style={{ color: "var(--text)" }}>{user.prenom} {user.nom}</p>
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>{user.email}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`badge ${user.role === "MANAGER"
+                    ? "bg-purple-50 text-purple-700 border border-purple-200"
+                    : "bg-slate-100 text-slate-600 border border-slate-200"}`}>
+                    {user.role}
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`badge ${statut.class}`}>{statut.label}</span>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-2" style={{ minWidth: "90px" }}>
+                    <div className="flex-1 rounded-full h-2" style={{ background: "var(--border)" }}>
+                      <div
+                        className={`h-2 rounded-full transition-all ${user.profilCompletion === 100 ? "bg-emerald-500" : "bg-indigo-500"}`}
+                        style={{ width: `${user.profilCompletion}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-medium" style={{ color: "var(--text-muted)", width: "36px", textAlign: "right" }}>
+                      {user.profilCompletion}%
+                    </span>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  {joursRestants !== null ? (
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${
+                      joursRestants <= 0 ? "bg-red-50 text-red-500"
+                      : joursRestants <= 1 ? "bg-orange-50 text-orange-500"
+                      : "bg-slate-100 text-slate-500"}`}>
+                      {joursRestants <= 0 ? "Expiré" : `J-${joursRestants}`}
+                    </span>
+                  ) : <span style={{ color: "var(--text-muted)" }} className="text-xs">—</span>}
+                </td>
+                {/* ⭐ NOUVELLE COLONNE POSTE */}
+                <td className="px-6 py-4">
+                  {userPoste ? (
+                    <span className="text-xs px-2 py-1 rounded-lg font-medium"
+                      style={{ background: "rgba(0,174,239,0.08)", color: "#00AEEF", border: "1px solid rgba(0,174,239,0.15)" }}>
+                      💼 {userPoste}
+                    </span>
+                  ) : (
+                    <span className="text-xs italic" style={{ color: "var(--text-muted)" }}>
+                      Pas d'affectation
+                    </span>
+                  )}
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => navigate(`/admin/salarie/${user.id}`)}
+                      className="btn-secondary text-xs px-3 py-2"
+                    >
+                      Voir →
+                    </button>
+                    {canValidate && (
+                      <button
+                        onClick={() => validateMutation.mutate(user.id)}
+                        disabled={validateMutation.isPending}
+                        className="text-xs px-3 py-2 rounded-xl font-semibold transition"
+                        style={{ background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" }}
+                      >
+                        ✅ Valider
+                      </button>
+                    )}
+                    {/* Bouton désactiver - visible pour les comptes actifs (non déjà désactivés) */}
+                    {user.statutCompte !== "DESACTIVE" && user.statutCompte !== "EXPIRE" && (
+                      <button
+                        onClick={() => {
+                          setUserToDisable(user);
+                          setShowDisableModal(true);
+                        }}
+                        disabled={disableMutation.isPending}
+                        className="text-xs px-3 py-2 rounded-xl font-semibold transition"
+                        style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}
+                        title="Désactiver le compte"
+                      >
+                        🔒 Désactiver
+                      </button>
+                    )}
+                    
+                    {/* Badge pour les comptes déjà désactivés */}
+                    {user.statutCompte === "DESACTIVE" && (
+                      <span className="text-xs px-3 py-2 rounded-xl bg-slate-100 text-slate-500 border border-slate-200">
+                        Désactivé
+                      </span>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  )}
+</div>
         </div>
         {/* Modal de confirmation de désactivation */}
 {showDisableModal && userToDisable && (
@@ -481,43 +552,61 @@ const disableMutation = useMutation({
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Nom</label>
-                  <input type="text" value={nom} onChange={(e) => setNom(e.target.value)} required placeholder="Dupont" className="input-field" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Prénom</label>
-                  <input type="text" value={prenom} onChange={(e) => setPrenom(e.target.value)} required placeholder="Jean" className="input-field" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Email</label>
-                <input type="email" value={employeeEmail} onChange={(e) => setEmployeeEmail(e.target.value)} required placeholder="employe@gmail.com" className="input-field" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Rôle</label>
-                  <select value={role} onChange={(e) => setRole(e.target.value as UserRole)} className="input-field">
-                    <option value="SALARIE">Salarié</option>
-                    <option value="MANAGER">Manager</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Délai (jours)</label>
-                  <input type="number" value={joursLimite} onChange={(e) => setJoursLimite(Number(e.target.value))} min={1} max={30} required className="input-field" />
-                </div>
-              </div>
-              {errorMessage && (
-                <div className="px-4 py-3 rounded-xl text-xs" style={{ background: "#fef2f2", color: "#dc2626" }}>⚠ {errorMessage}</div>
-              )}
-              <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={createMutation.isPending} className="btn-primary flex-1 py-3">
-                  {createMutation.isPending ? "Envoi..." : "Envoyer l'invitation →"}
-                </button>
-                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary px-6 py-3">Annuler</button>
-              </div>
-            </form>
+  <div className="grid grid-cols-2 gap-3">
+    <div>
+      <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Nom</label>
+      <input type="text" value={nom} onChange={(e) => setNom(e.target.value)} required placeholder="Nom" className="input-field" />
+    </div>
+    <div>
+      <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Prénom</label>
+      <input type="text" value={prenom} onChange={(e) => setPrenom(e.target.value)} required placeholder="Prénom" className="input-field" />
+    </div>
+  </div>
+
+  <div>
+    <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Email</label>
+    <input type="email" value={employeeEmail} onChange={(e) => setEmployeeEmail(e.target.value)} required placeholder="employe@gmail.com" className="input-field" />
+  </div>
+
+  {/* ── Ligne : Rôle + Délai + Date d'embauche ── */}
+  <div className="grid grid-cols-3 gap-3">
+    <div>
+      <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Rôle</label>
+      <select value={role} onChange={(e) => setRole(e.target.value as UserRole)} className="input-field">
+        <option value="SALARIE">Salarié</option>
+        <option value="MANAGER">Manager</option>
+      </select>
+    </div>
+    <div>
+      <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Délai (jours)</label>
+      <input type="number" value={joursLimite} onChange={(e) => setJoursLimite(Number(e.target.value))} min={1} max={30} required className="input-field" />
+    </div>
+    <div>
+      <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>
+        Date d'embauche <span className="text-red-400">*</span>
+      </label>
+      <input
+        type="date"
+        value={dateEmbauche}
+        onChange={(e) => setDateEmbauche(e.target.value)}
+        required
+        className="input-field"
+        min={new Date().toISOString().split("T")[0]}
+      />
+    </div>
+  </div>
+
+  {errorMessage && (
+    <div className="px-4 py-3 rounded-xl text-xs" style={{ background: "#fef2f2", color: "#dc2626" }}>⚠ {errorMessage}</div>
+  )}
+
+  <div className="flex gap-3 pt-2">
+    <button type="submit" disabled={createMutation.isPending} className="btn-primary flex-1 py-3">
+      {createMutation.isPending ? "Envoi..." : "Envoyer l'invitation →"}
+    </button>
+    <button type="button" onClick={() => setShowForm(false)} className="btn-secondary px-6 py-3">Annuler</button>
+  </div>
+</form>
           </div>
         </div>
       )}

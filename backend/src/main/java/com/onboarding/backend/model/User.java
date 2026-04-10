@@ -42,7 +42,6 @@ public class User {
     private String poste; // ← AJOUTER après dateValidation
     private LocalDateTime dateLimit;
     private ProfessionalInfo professionalInfo;
-
     @Data
     @NoArgsConstructor
     public static class Profile {
@@ -82,6 +81,8 @@ public class User {
         private String emailProfessionnel;
         private String telephoneProfessionnel;
         private LocalDate dateEmbauche;
+        private LocalDate datePriseDePoste; // ← NOUVEAU
+        private boolean datePriseDePostePersonnalisee = false;
 
     }
 }

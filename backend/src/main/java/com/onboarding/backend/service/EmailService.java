@@ -6,6 +6,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -18,7 +19,7 @@ public class EmailService {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
-    public void sendActivationEmail(String toEmail, String token, String fullName, LocalDateTime dateLimit) {
+    public void sendActivationEmail(String toEmail, String token, String fullName, LocalDateTime dateLimit, LocalDate dateEmbauche ) {
         String activationLink = frontendUrl + "/activate-account?token=" + token;
 
         // Formater la date limite en français : ex "28/02/2025 à 14:30"
@@ -35,13 +36,14 @@ public class EmailService {
                         "et définir votre mot de passe :\n\n" +
                         activationLink + "\n\n" +
                         "⚠️ IMPORTANT : Vous devez compléter votre profil à 100% avant le : " + dateLimitFormatee + "\n" +
+                        "date d'embauche"+ dateEmbauche +" "+
                         "Passé ce délai, votre compte sera automatiquement désactivé si votre profil est incomplet.\n\n" +
                         "Cordialement,\nL'équipe RH"
         );
 
         mailSender.send(message);
     }
-    public void sendCorrectionEmail(String toEmail, String prenomNom, String commentaire, String dateLimite) {
+    public void sendCorrectionEmail(String toEmail, String prenomNom, String commentaire) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
         message.setSubject("⚠️ Correction requise — Votre profil OnboardPro");
@@ -49,7 +51,6 @@ public class EmailService {
                 "Bonjour " + prenomNom + ",\n\n" +
                         "Votre responsable RH a examiné votre profil et demande des corrections.\n\n" +
                         "📝 Commentaire RH :\n" + commentaire + "\n\n" +
-                        "📅 Date limite pour effectuer les corrections : " + dateLimite + "\n\n" +
                         "Veuillez vous connecter à votre espace OnboardPro et mettre à jour vos informations.\n\n" +
                         "Cordialement,\n" +
                         "L'équipe RH — OnboardPro"

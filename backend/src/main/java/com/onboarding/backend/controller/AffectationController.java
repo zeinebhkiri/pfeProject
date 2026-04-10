@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -56,6 +57,24 @@ public class AffectationController {
         affectation.setPositionId(request.getPositionId());
         affectation.setManagerId(request.getManagerId());
         affectation.setDateAffectation(LocalDateTime.now());
+        if (request.getDatePriseDePoste() != null && !request.getDatePriseDePoste().isBlank()) {
+            if (user.getProfessionalInfo() == null)
+                user.setProfessionalInfo(new User.ProfessionalInfo());
+            user.getProfessionalInfo().setDatePriseDePoste(
+                    LocalDate.parse(request.getDatePriseDePoste())
+            );
+            user.getProfessionalInfo().setDatePriseDePostePersonnalisee(true);
+            userRepository.save(user);
+        } else {
+            // ⭐ Si aucune date n'est fournie, utiliser la date d'embauche
+            if (user.getProfessionalInfo() != null && user.getProfessionalInfo().getDateEmbauche() != null) {
+                if (user.getProfessionalInfo().getDatePriseDePoste() == null) {
+                    user.getProfessionalInfo().setDatePriseDePoste(user.getProfessionalInfo().getDateEmbauche());
+                    userRepository.save(user);
+                }
+            }
+        }
+
         Affectation saved = affectationRepository.save(affectation);
         try {
             parcoursService.genererParcours(
@@ -98,7 +117,7 @@ public class AffectationController {
 
     // ── Récupérer toutes les affectations ───────────────────────────────────
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<?> getAllAffectations() {
         return ResponseEntity.ok(affectationRepository.findAll());
     }
@@ -109,5 +128,6 @@ public class AffectationController {
         private String userId;
         private String positionId;  // ← remplace poste
         private String managerId;
+        private String datePriseDePoste;
     }
 }

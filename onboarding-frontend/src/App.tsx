@@ -24,6 +24,7 @@ import AdminPostesPage from "./pages/AdminPostesPage";
 import AdminParcoursTemplatesPage from "./pages/AdminParcoursTemplatesPage";
 import MonParcoursPage from "./pages/MonParcoursPage";
 import ManagerParcoursPage from "./pages/ManagerParcoursPage";
+import AdminParcoursPage from "./pages/AdminParcoursPage";
 const queryClient = new QueryClient();
 
 function App() {
@@ -52,6 +53,7 @@ function App() {
           <Route path="/admin/documents" element={<ProtectedAdminRoute><AdminDocumentsPage /></ProtectedAdminRoute>} />
           <Route path="/admin/postes" element={<ProtectedAdminRoute><AdminPostesPage /></ProtectedAdminRoute>} />
           <Route path="/admin/parcours" element={<ProtectedAdminRoute><AdminParcoursTemplatesPage /></ProtectedAdminRoute>} />
+          <Route path="/admin/suivi-parcours" element={<ProtectedAdminRoute><AdminParcoursPage /></ProtectedAdminRoute>} />
 
           {/* Manager */}
           <Route path="/manager" element={<ProtectedManagerRoute><ManagerDashboardPage /></ProtectedManagerRoute>} />
@@ -59,6 +61,7 @@ function App() {
           <Route path="/manager/analytics" element={<ProtectedManagerRoute><ManagerAnalyticsPage /></ProtectedManagerRoute>} />
           <Route path="/manager/salarie/:id" element={<ProtectedManagerRoute><ManagerSalarieProfilePage /></ProtectedManagerRoute>} />
           <Route path="/manager/parcours" element={<ProtectedManagerRoute><ManagerParcoursPage /></ProtectedManagerRoute>} />
+          
 
           {/* Redirections */}
           <Route path="/" element={<Navigate to="/login" replace />} />

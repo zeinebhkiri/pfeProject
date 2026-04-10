@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUserApi, updateMyProfileApi, getAffectationByUserApi, getAllManagersApi,getPositionsApi } from "../api/authApi";
+import { getCurrentUserApi, updateMyProfileApi, getAffectationByUserApi, getAllManagersApi,getPositionsApi, getAllUsersApi, getUserByIdApi } from "../api/authApi";
 import { useAuth } from "../hooks/useAuth";
 import Sidebar from "../components/Sidebar";
 import type { StatutCompte, UserProfile, UserRole , ProfessionalInfo, Position} from "../types/auth";
@@ -46,7 +46,15 @@ const ProfilPage = () => {
   const [photoPostePreview, setPhotoPostePreview]     = useState<string | null>(null);
   const [photoPosteSuccess, setPhotoPosteSuccess]     = useState("");
   const [photoPosteFile, setPhotoPosteFile]           = useState<File | null>(null);
-
+const [ageError, setAgeError] = useState("");
+const [sensitiveFieldsLocked, setSensitiveFieldsLocked] = useState({
+  rib: false,
+  cnss: false,
+  dateNaissance: false,
+  lieuNaissance: false,
+  nationalite: false,
+  genre: false
+});
   const { data: user, isLoading } = useQuery({
     queryKey: ["currentUser"],
     queryFn: getCurrentUserApi,
@@ -62,9 +70,9 @@ const ProfilPage = () => {
   const { data: managers } = useQuery({
     queryKey: ["managers"],
     queryFn: getAllManagersApi,
-    enabled: !!affectation?.managerId,
+    enabled: true,
   });
-  
+
   const { data: positions = [] } = useQuery({
   queryKey: ["positions"],
   queryFn: getPositionsApi,
@@ -83,6 +91,15 @@ const ProfilPage = () => {
       setNationalite(user.profile.nationalite || "");
       setGenre(user.profile.genre || "");
       if (user.profile.photoPoste) setPhotoPostePreview(user.profile.photoPoste);
+          // ⭐ Si un champ sensible a déjà une valeur, on le bloque
+    setSensitiveFieldsLocked({
+      rib: !!user.profile.rib,
+      cnss: !!user.profile.numeroCnss,
+      dateNaissance: !!user.profile.dateNaissance,
+      lieuNaissance: !!user.profile.lieuNaissance,
+      nationalite: !!user.profile.nationalite,
+      genre: !!user.profile.genre
+    });
     }
   }, [user?.profile]);
 
@@ -99,16 +116,38 @@ const ProfilPage = () => {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateMutation.mutate({
-      adresse, rib, telephone,
-      image: user?.profile?.image || "",
-      numeroCnss, dateNaissance, lieuNaissance,
-      nomBanque, statutSocial, nationalite, genre,
-      photoPoste: photoPostePreview || "",
-    });
-  };
+ // Modifie handleSubmit pour bloquer les champs après sauvegarde
+const handleSubmit = (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  updateMutation.mutate({
+    adresse, rib, telephone,
+    image: user?.profile?.image || "",
+    numeroCnss, dateNaissance, lieuNaissance,
+    nomBanque, statutSocial, nationalite, genre,
+    photoPoste: photoPostePreview || "",
+  }, {
+    onSuccess: () => {
+      // ⭐ Après succès, bloquer les champs sensibles qui viennent d'être remplis
+      setSensitiveFieldsLocked({
+        rib: !!rib,
+        cnss: !!numeroCnss,
+        dateNaissance: !!dateNaissance,
+        lieuNaissance: !!lieuNaissance,
+        nationalite: !!nationalite,
+        genre: !!genre
+      });
+      
+      setSuccessMsg("Profil mis à jour avec succès !");
+      setErrorMsg("");
+      setEditMode(false);
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+    },
+    onError: (error: any) => {
+      setErrorMsg(error.response?.data?.error || "Erreur lors de la mise à jour.");
+    }
+  });
+};
 
   const handleSavePhotoPoste = async () => {
     let photoToSave = photoPosteUrl.trim();
@@ -166,7 +205,18 @@ const ProfilPage = () => {
     : null;
 
   const completion = user?.profilCompletion ?? 0;
-
+// Ajoute cette fonction après les useState
+const validateAge = (dateNaissance: string): boolean => {
+  if (!dateNaissance) return true;
+  const birthDate = new Date(dateNaissance);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age >= 20;
+};
   const fields = [
     { label: "Adresse",          value: user?.profile?.adresse,       state: adresse,       setState: setAdresse,       placeholder: "12 rue de la Paix", type: "text",        icon: "🏠", description: "Votre adresse postale complète" },
     { label: "RIB",              value: user?.profile?.rib,           state: rib,           setState: setRib,           placeholder: "FR76 3000 6000...", type: "text",        icon: "🏦", description: "Format IBAN" },
@@ -377,6 +427,7 @@ const ProfilPage = () => {
                   { icon: "✉️", label: "Email",          value: user?.email },
                   { icon: "💼", label: "Rôle",           value: user?.role },
                   { icon: "📋", label: "Poste", value: (positions as Position[]).find(p => p.id === affectation?.positionId)?.titre || "Non affecté" },
+                  { icon: "👔", label: "Manager", value: managerNom || "Non affecté" },
                   { icon: "📅", label: "Membre depuis",  value: user?.dateCreation ? new Date(user.dateCreation).toLocaleDateString("fr-FR") : "N/A" },
                 ].map((f) => (
                   <div key={f.label} className="flex items-start gap-3 p-3 rounded-xl"
@@ -487,69 +538,155 @@ const ProfilPage = () => {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit}>
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    {fields.map((f, index) => (
-                      <div key={index}>
-                        <label className="flex items-center gap-2 text-sm font-medium mb-1.5"
-                          style={{ color: "var(--text)" }}>
-                          <span>{f.icon}</span> {f.label}
-                        </label>
-                        {f.type === "radio" ? (
-                          <div className="flex gap-4 mt-1">
-                            {["CELIBATAIRE", "MARIE"].map((v) => (
-                              <label key={v} className="flex items-center gap-2 text-sm cursor-pointer">
-                                <input type="radio" value={v} checked={statutSocial === v}
-                                  onChange={(e) => setStatutSocial(e.target.value)}
-                                  style={{ accentColor: "#00AEEF" }} />
-                                <span style={{ color: "var(--text)" }}>{v}</span>
-                              </label>
-                            ))}
-                          </div>
-                        ) : f.type === "radio-genre" ? (
-                          <div className="flex gap-4 mt-1">
-                            {["HOMME", "FEMME"].map((v) => (
-                              <label key={v} className="flex items-center gap-2 text-sm cursor-pointer">
-                                <input type="radio" value={v} checked={genre === v}
-                                  onChange={(e) => setGenre(e.target.value)}
-                                  style={{ accentColor: "#00AEEF" }} />
-                                <span style={{ color: "var(--text)" }}>{v}</span>
-                              </label>
-                            ))}
-                          </div>
-                        ) : f.type === "select" ? (
-                          <select value={nationalite} onChange={(e) => setNationalite(e.target.value)}
-                            className="input-field">
-                            <option value="">Sélectionner</option>
-                            {["Tunisie","France","Algérie","Maroc","Belgique","Canada","Suisse","Italie","Espagne","Allemagne"].map((p) => (
-                              <option key={p} value={p}>{p}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input type={f.type} value={f.state}
-                            onChange={(e) => f.setState(e.target.value)}
-                            placeholder={f.placeholder} className="input-field" />
-                        )}
-                        <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{f.description}</p>
-                      </div>
-                    ))}
-                  </div>
+  <div className="grid grid-cols-2 gap-4 mb-6">
+    {fields.map((f, index) => {
+      // Déterminer si c'est un champ sensible et s'il est bloqué
+      let isSensitiveLocked = false;
+      let fieldKey = "";
+      
+      switch(f.label) {
+        case "RIB":
+          isSensitiveLocked = sensitiveFieldsLocked.rib;
+          fieldKey = "rib";
+          break;
+        case "Numéro CNSS":
+          isSensitiveLocked = sensitiveFieldsLocked.cnss;
+          fieldKey = "cnss";
+          break;
+        case "Date de naissance":
+          isSensitiveLocked = sensitiveFieldsLocked.dateNaissance;
+          fieldKey = "dateNaissance";
+          break;
+        case "Lieu de naissance":
+          isSensitiveLocked = sensitiveFieldsLocked.lieuNaissance;
+          fieldKey = "lieuNaissance";
+          break;
+        case "Nationalité":
+          isSensitiveLocked = sensitiveFieldsLocked.nationalite;
+          fieldKey = "nationalite";
+          break;
+        case "Genre":
+          isSensitiveLocked = sensitiveFieldsLocked.genre;
+          fieldKey = "genre";
+          break;
+        default:
+          isSensitiveLocked = false; // Champs normaux toujours modifiables
+      }
+      
+      return (
+        <div key={index}>
+          <label className="flex items-center gap-2 text-sm font-medium mb-1.5"
+            style={{ color: "var(--text)" }}>
+            <span>{f.icon}</span> {f.label}
+            {isSensitiveLocked && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 ml-2">
+                🔒 Définitif
+              </span>
+            )}
+          </label>
+          
+          {f.type === "radio" ? (
+            <div className="flex gap-4 mt-1">
+              {["CELIBATAIRE", "MARIE"].map((v) => (
+                <label key={v} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input 
+                    type="radio" 
+                    value={v} 
+                    checked={statutSocial === v}
+                    onChange={(e) => setStatutSocial(e.target.value)}
+                    disabled={false} // Statut social toujours modifiable
+                    style={{ accentColor: "#00AEEF" }} 
+                  />
+                  <span style={{ color: "var(--text)" }}>{v}</span>
+                </label>
+              ))}
+            </div>
+          ) : f.type === "radio-genre" ? (
+            <div className="flex gap-4 mt-1">
+              {["HOMME", "FEMME"].map((v) => (
+                <label key={v} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input 
+                    type="radio" 
+                    value={v} 
+                    checked={genre === v}
+                    onChange={(e) => {
+                      setGenre(e.target.value);
+                    
+                    }}
+                    disabled={isSensitiveLocked}
+                    style={{ accentColor: "#00AEEF" }} 
+                  />
+                  <span style={{ color: "var(--text)" }}>{v}</span>
+                </label>
+              ))}
+            </div>
+          ) : f.type === "select" ? (
+            <select 
+              value={nationalite} 
+              onChange={(e) => {
+                setNationalite(e.target.value);
+            
+              }}
+              disabled={isSensitiveLocked}
+              className="input-field">
+              <option value="">Sélectionner</option>
+              {["Tunisie","France","Algérie","Maroc","Belgique","Canada","Suisse","Italie","Espagne","Allemagne"].map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          ) : (
+            <input 
+              type={f.type} 
+              value={f.state}
+              onChange={(e) => {
+                f.setState(e.target.value);
+             
+            
+                // Validation spéciale pour la date de naissance
+                if (f.label === "Date de naissance") {
+                  if (!validateAge(e.target.value)) {
+                    setAgeError("⚠️ Vous devez avoir au moins 20 ans");
+                  } else {
+                    setAgeError("");
+                  }
+                }
+              }}
+              placeholder={f.placeholder} 
+              disabled={isSensitiveLocked}
+              className="input-field" 
+            />
+          )}
+          
+          {/* Message d'erreur pour la date de naissance */}
+          {f.label === "Date de naissance" && ageError && (
+            <p className="text-xs mt-1 text-red-500">{ageError}</p>
+          )}
+          
+          <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{f.description}</p>
+        </div>
+      );
+    })}
+  </div>
 
-                  <div className="flex gap-3">
-                    <button type="submit" disabled={updateMutation.isPending} className="btn-primary flex-1 py-2.5">
-                      {updateMutation.isPending ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Enregistrement...
-                        </span>
-                      ) : "💾 Enregistrer"}
-                    </button>
-                    <button type="button"
-                      onClick={() => { setEditMode(false); setSuccessMsg(""); setErrorMsg(""); }}
-                      className="btn-secondary px-6 py-2.5">
-                      Annuler
-                    </button>
-                  </div>
-                </form>
+  <div className="flex gap-3">
+    <button 
+      type="submit" 
+      disabled={updateMutation.isPending || (dateNaissance && !validateAge(dateNaissance)) || !!ageError}
+      className="btn-primary flex-1 py-2.5">
+      {updateMutation.isPending ? (
+        <span className="flex items-center justify-center gap-2">
+          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          Enregistrement...
+        </span>
+      ) : "💾 Enregistrer"}
+    </button>
+    <button type="button"
+      onClick={() => { setEditMode(false); setSuccessMsg(""); setErrorMsg(""); setAgeError(""); }}
+      className="btn-secondary px-6 py-2.5">
+      Annuler
+    </button>
+  </div>
+</form>
               )}
             </div>
           </div>
@@ -601,6 +738,13 @@ const ProfilPage = () => {
               <label className="text-sm text-gray-500">Date d'embauche</label>
               <p className="font-medium">
                 {user?.professionalInfo?.dateEmbauche || "-"}
+              </p>
+            </div>
+
+                 <div>
+              <label className="text-sm text-gray-500">Date de prise de poste</label>
+              <p className="font-medium">
+                {user?.professionalInfo?.datePriseDePoste|| "-"}
               </p>
             </div>
             </div>

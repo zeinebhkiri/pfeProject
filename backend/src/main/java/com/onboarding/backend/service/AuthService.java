@@ -16,6 +16,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -61,6 +62,33 @@ public class AuthService {
         user.setDateCreation(LocalDateTime.now());
         user.setDateLimit(LocalDateTime.now().plusDays(request.getJoursLimite()));
 
+        // ⭐ Initialiser ProfessionalInfo avec la date d'embauche du formulaire ⭐
+        User.ProfessionalInfo professionalInfo = new User.ProfessionalInfo();
+
+        // Attacher la date d'embauche (obligatoire)
+        if (request.getDateEmbauche() != null && !request.getDateEmbauche().isBlank()) {
+            professionalInfo.setDateEmbauche(LocalDate.parse(request.getDateEmbauche()));
+        } else {
+            // Option: mettre la date du jour si non fournie
+            professionalInfo.setDateEmbauche(LocalDate.now());
+        }
+        // Dans createEmployee — après avoir set dateEmbauche
+        if (request.getDateEmbauche() != null && !request.getDateEmbauche().isBlank()) {
+            if (user.getProfessionalInfo() == null) {
+                user.setProfessionalInfo(new User.ProfessionalInfo());
+            }
+            LocalDate embauche = LocalDate.parse(request.getDateEmbauche());
+            user.getProfessionalInfo().setDateEmbauche(embauche);
+            user.getProfessionalInfo().setDatePriseDePoste(embauche); // ← sync auto
+            user.getProfessionalInfo().setDatePriseDePostePersonnalisee(false);
+        }
+
+        // ⭐ Les autres champs professionnels restent vides ou null pour l'instant
+        // (ils pourront être modifiés plus tard via l'endpoint PUT)
+        professionalInfo.setEmailProfessionnel(null);
+        professionalInfo.setTelephoneProfessionnel(null);
+
+        user.setProfessionalInfo(professionalInfo);
         User savedUser = userRepository.save(user);
 
         String tokenValue = UUID.randomUUID().toString();
@@ -79,7 +107,8 @@ public class AuthService {
                 savedUser.getEmail(),
                 tokenValue,
                 savedUser.getPrenom() + " " + savedUser.getNom(),
-                savedUser.getDateLimit()  // ← AJOUTER ce paramètre
+                savedUser.getDateLimit(),// ← AJOUTER ce paramètre
+                savedUser.getProfessionalInfo().getDateEmbauche()
         );
 
         return "Compte " + request.getRole().name() + " créé. Email d'activation envoyé à " + savedUser.getEmail();
@@ -122,7 +151,7 @@ public class AuthService {
         // Set hashed password and activate account
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setStatutCompte(StatutCompte.ACCEPTE);
-        user.setDateValidation(LocalDateTime.now());
+        //user.setDateValidation(LocalDateTime.now());
         userRepository.save(user);
 
         // Mark token as used

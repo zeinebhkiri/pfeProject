@@ -4,12 +4,12 @@ import { uploadDocumentApi, deleteDocumentApi } from "../api/authApi";
 import { type UserDocument } from "../types/auth";
 
 const TYPES_DOCUMENTS = [
-  { value: "RIB", label: "💳 RIB bancaire" },
-  { value: "CIN", label: "🪪 Carte d'identité" },
-  { value: "DIPLOME", label: "🎓 Diplôme" },
-  { value: "CONTRAT", label: "📄 Contrat" },
-  { value: "PHOTO", label: "📷 Photo" },
-  { value: "AUTRE", label: "📎 Autre" },
+  { value: "RIB", label: "💳 RIB bancaire", required: true },
+  { value: "CIN", label: "🪪 Carte d'identité", required: true },
+  { value: "DIPLOME", label: "🎓 Diplôme", required: true },
+  { value: "CONTRAT", label: "📄 Contrat", required: false },
+  { value: "PHOTO", label: "📷 Photo", required: false },
+  { value: "AUTRE", label: "📎 Autre", required: false },
 ];
 
 const typeIcon: Record<string, string> = {
@@ -21,6 +21,7 @@ interface Props {
   documents: UserDocument[];
   disabled?: boolean;
 }
+
 const detectMimeType = (base64: string): string => {
   if (base64.startsWith("/9j/")) return "image/jpeg";
   if (base64.startsWith("iVBORw0KGgo")) return "image/png";
@@ -28,6 +29,7 @@ const detectMimeType = (base64: string): string => {
   if (base64.startsWith("UEsDB")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   return "application/octet-stream";
 };
+
 const DocumentsSection = ({ documents, disabled }: Props) => {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -39,6 +41,13 @@ const DocumentsSection = ({ documents, disabled }: Props) => {
   const [uploadError, setUploadError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [docToDelete, setDocToDelete] = useState<UserDocument | null>(null);
+
+  // Vérifier quels documents obligatoires sont déjà téléchargés
+  const uploadedTypes = documents.map(doc => doc.type);
+  const requiredDocs = ["RIB", "CIN", "DIPLOME"];
+  const missingRequiredDocs = requiredDocs.filter(type => !uploadedTypes.includes(type));
+  const hasAllRequiredDocs = missingRequiredDocs.length === 0;
+
   const uploadMutation = useMutation({
     mutationFn: uploadDocumentApi,
     onSuccess: () => {
@@ -80,40 +89,40 @@ const DocumentsSection = ({ documents, disabled }: Props) => {
     reader.readAsDataURL(docFile);
   };
 
-const handlePreview = (doc: UserDocument) => {
-  if (!doc.contenu) return;
+  const handlePreview = (doc: UserDocument) => {
+    if (!doc.contenu) return;
 
-  let base64 = doc.contenu;
-  if (base64.includes(",")) {
-    base64 = base64.split(",")[1];
-  }
+    let base64 = doc.contenu;
+    if (base64.includes(",")) {
+      base64 = base64.split(",")[1];
+    }
 
-  const padding = base64.length % 4;
-  if (padding === 2) base64 += "==";
-  else if (padding === 3) base64 += "=";
+    const padding = base64.length % 4;
+    if (padding === 2) base64 += "==";
+    else if (padding === 3) base64 += "=";
 
-  const mimeType = detectMimeType(base64);
+    const mimeType = detectMimeType(base64);
 
-  const byteChars = atob(base64);
-  const byteArr = new Uint8Array(byteChars.length);
-  for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+    const byteChars = atob(base64);
+    const byteArr = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
 
-  const blob = new Blob([byteArr], { type: mimeType });
-  const url = URL.createObjectURL(blob);
+    const blob = new Blob([byteArr], { type: mimeType });
+    const url = URL.createObjectURL(blob);
 
-  if (mimeType === "application/pdf" || mimeType.startsWith("image/")) {
-    window.open(url, "_blank");
-  } else {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = doc.nom || "document";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
+    if (mimeType === "application/pdf" || mimeType.startsWith("image/")) {
+      window.open(url, "_blank");
+    } else {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = doc.nom || "document";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
 
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
-};
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  };
 
   return (
     <div className="card">
@@ -129,16 +138,18 @@ const handlePreview = (doc: UserDocument) => {
             </div>
             <div>
               <h2 className="text-base font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>
-                Mes documents
+                Documents obligatoires
               </h2>
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                RIB, diplômes, CIN, contrats...
+                {hasAllRequiredDocs 
+                  ? "✓ Tous les documents requis sont téléchargés" 
+                  : `${documents.length}/3 documents téléchargés`}
               </p>
             </div>
           </div>
           {!disabled && (
             <button
-            type="button"
+              type="button"
               onClick={() => { setShowUploadModal(true); setUploadError(""); }}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition hover:scale-105"
               style={{ background: "#eef2ff", color: "#4f46e5", border: "1px solid #c7d2fe" }}
@@ -152,6 +163,29 @@ const handlePreview = (doc: UserDocument) => {
           )}
         </div>
 
+        {/* Barre de progression */}
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+              Progression des documents requis
+            </span>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+              hasAllRequiredDocs ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+            }`}>
+              {documents.filter(d => requiredDocs.includes(d.type)).length}/3
+            </span>
+          </div>
+          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
+            <div 
+              className="h-full rounded-full transition-all duration-500"
+              style={{ 
+                width: `${(documents.filter(d => requiredDocs.includes(d.type)).length / 3) * 100}%`,
+                background: hasAllRequiredDocs ? "#8DC63F" : "#00AEEF"
+              }} 
+            />
+          </div>
+        </div>
+
         {successMsg && (
           <div className="mb-4 flex items-center gap-2 px-4 py-3 rounded-xl text-sm"
             style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#065f46" }}>
@@ -161,84 +195,152 @@ const handlePreview = (doc: UserDocument) => {
         )}
 
         {documents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 gap-3"
-            style={{ border: "2px dashed var(--border)", borderRadius: "16px" }}>
-            <span className="text-4xl">📂</span>
-            <p className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>
-              Aucun document déposé
-            </p>
-            {!disabled && (
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                Cliquez sur "Ajouter" pour déposer vos documents
+          <div className="flex flex-col items-center justify-center py-12 gap-4"
+            style={{ background: "#fffbeb", border: "2px dashed #fcd34d", borderRadius: "20px" }}>
+            <div className="w-20 h-20 rounded-full flex items-center justify-center bg-amber-100">
+              <span className="text-4xl">📄</span>
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-base font-bold" style={{ color: "#92400e" }}>
+                Aucun document déposé
               </p>
-            )}
+              <p className="text-sm max-w-md" style={{ color: "#b45309" }}>
+                Conformément à la procédure d'onboarding, vous devez impérativement télécharger les <strong className="font-semibold">3 documents obligatoires</strong> suivants :
+              </p>
+              <div className="flex flex-col gap-1 mt-3">
+                {requiredDocs.map(doc => {
+                  const docLabel = TYPES_DOCUMENTS.find(t => t.value === doc)?.label;
+                  return (
+                    <div key={doc} className="flex items-center justify-center gap-2 text-sm">
+                      <span className="text-amber-600">•</span>
+                      <span style={{ color: "#78350f" }}>{docLabel}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs mt-3" style={{ color: "#b45309" }}>
+                Ces documents sont essentiels pour finaliser votre dossier et activer votre compte.
+              </p>
+              {!disabled && (
+                <button
+                  type="button"
+                  onClick={() => { setShowUploadModal(true); setUploadError(""); }}
+                  className="mt-4 px-6 py-2.5 rounded-xl text-sm font-semibold transition hover:scale-105"
+                  style={{ background: "#00AEEF", color: "white" }}
+                >
+                  + Télécharger mes documents
+                </button>
+              )}
+            </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            {documents.map((doc) => (
-              <div key={doc.id}
-                className="flex items-center gap-4 p-4 rounded-2xl transition"
-                style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-                  style={{ background: "#eef2ff" }}>
-                  {typeIcon[doc.type] ?? "📎"}
+          <>
+            {/* Afficher les documents manquants si nécessaire */}
+            {!hasAllRequiredDocs && !disabled && (
+              <div className="mb-4 p-4 rounded-xl" style={{ background: "#fffbeb", border: "1px solid #fcd34d" }}>
+                <p className="text-sm font-medium mb-2" style={{ color: "#92400e" }}>
+                  ⚠️ Documents manquants obligatoires :
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {missingRequiredDocs.map(doc => {
+                    const docLabel = TYPES_DOCUMENTS.find(t => t.value === doc)?.label;
+                    return (
+                      <span key={doc} className="text-xs px-3 py-1.5 rounded-full" 
+                        style={{ background: "#fed7aa", color: "#92400e" }}>
+                        {docLabel}
+                      </span>
+                    );
+                  })}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>
-                    {doc.nom}
-                  </p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs px-2 py-0.5 rounded-full"
-                      style={{ background: "#eef2ff", color: "#4f46e5" }}>
-                      {TYPES_DOCUMENTS.find(t => t.value === doc.type)?.label ?? doc.type}
-                    </span>
-                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {new Date(doc.dateUpload).toLocaleDateString("fr-FR", {
-                        day: "2-digit", month: "short", year: "numeric"
-                      })}
-                    </span>
+                <p className="text-xs mt-2" style={{ color: "#b45309" }}>
+                  Veuillez télécharger ces documents pour compléter votre dossier.
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {documents.map((doc) => (
+                <div key={doc.id}
+                  className="flex items-center gap-4 p-4 rounded-2xl transition hover:shadow-md"
+                  style={{ background: "var(--bg)", border: `1px solid ${requiredDocs.includes(doc.type) ? "var(--border)" : "var(--border)"}` }}>
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                    style={{ background: "#eef2ff" }}>
+                    {typeIcon[doc.type] ?? "📎"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>
+                      {doc.nom}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs px-2 py-0.5 rounded-full"
+                        style={{ 
+                          background: requiredDocs.includes(doc.type) ? "#eef2ff" : "#f3f4f6",
+                          color: requiredDocs.includes(doc.type) ? "#4f46e5" : "var(--text-muted)"
+                        }}>
+                        {TYPES_DOCUMENTS.find(t => t.value === doc.type)?.label ?? doc.type}
+                        {requiredDocs.includes(doc.type) && " (Obligatoire)"}
+                      </span>
+                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                        {new Date(doc.dateUpload).toLocaleDateString("fr-FR", {
+                          day: "2-digit", month: "short", year: "numeric"
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {doc.contenu && (
+                      <button
+                        type="button"
+                        onClick={() => handlePreview(doc)}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center transition hover:scale-105"
+                        style={{ background: "#ecfdf5", color: "#059669" }}
+                        title="Voir le document"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                          <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                      </button>
+                    )}
+                    {!disabled && (
+                      <button
+                        type="button"
+                        onClick={() => setDocToDelete(doc)}
+                        disabled={deleteMutation.isPending}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center transition hover:scale-105"
+                        style={{ background: "#fef2f2", color: "#dc2626" }}
+                        title="Supprimer"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="3 6 5 6 21 6"/>
+                          <path d="M19 6l-1 14H6L5 6"/>
+                          <path d="M10 11v6M14 11v6"/>
+                          <path d="M9 6V4h6v2"/>
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {doc.contenu && (
-                    <button
-                    type="button"
-                      onClick={() => handlePreview(doc)}
-                      className="w-9 h-9 rounded-xl flex items-center justify-center transition hover:scale-105"
-                      style={{ background: "#ecfdf5", color: "#059669" }}
-                      title="Voir le document"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                      </svg>
-                    </button>
-                  )}
-                  {!disabled && (
-                    <button
-                    type="button"
-                      onClick={() => setDocToDelete(doc)}
-                      disabled={deleteMutation.isPending}
-                      className="w-9 h-9 rounded-xl flex items-center justify-center transition hover:scale-105"
-                      style={{ background: "#fef2f2", color: "#dc2626" }}
-                      title="Supprimer"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6l-1 14H6L5 6"/>
-                        <path d="M10 11v6M14 11v6"/>
-                        <path d="M9 6V4h6v2"/>
-                      </svg>
-                    </button>
-                  )}
-                </div>
+              ))}
+            </div>
+
+            {/* Message de succès quand tous les documents sont téléchargés */}
+            {hasAllRequiredDocs && (
+              <div className="mt-4 p-4 rounded-xl text-center" 
+                style={{ background: "#ecfdf5", border: "1px solid #a7f3d0" }}>
+                <p className="text-sm font-medium" style={{ color: "#065f46" }}>
+                  ✅ Félicitations ! Tous les documents obligatoires ont été téléchargés.
+                </p>
+                <p className="text-xs mt-1" style={{ color: "#065f46" }}>
+                  Votre dossier est maintenant complet.
+                </p>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Modal upload */}
+      {/* Modal upload (reste identique) */}
       {showUploadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowUploadModal(false)} />
@@ -292,6 +394,9 @@ const handlePreview = (doc: UserDocument) => {
                     </button>
                   ))}
                 </div>
+                <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
+                  <span className="text-red-500">*</span> Les documents RIB, CIN et Diplôme sont obligatoires
+                </p>
               </div>
 
               <div>
@@ -330,7 +435,7 @@ const handlePreview = (doc: UserDocument) => {
 
               <div className="flex gap-3 pt-2">
                 <button
-                type="button"
+                  type="button"
                   onClick={handleUpload}
                   disabled={uploadMutation.isPending || !docFile || !docNom.trim()}
                   className="btn-primary flex-1 py-3"
@@ -351,58 +456,59 @@ const handlePreview = (doc: UserDocument) => {
           </div>
         </div>
       )}
+
       {docToDelete && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center">
-    <div
-      className="absolute inset-0 bg-black/60"
-      onClick={() => setDocToDelete(null)}
-    />
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setDocToDelete(null)}
+          />
 
-    <div
-      className="relative rounded-3xl shadow-2xl p-8 w-full mx-4"
-      style={{ background: "var(--surface)", maxWidth: "420px", zIndex: 51 }}
-    >
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-2xl">⚠️</span>
-        <h3
-          className="text-lg font-bold"
-          style={{ color: "var(--text)", fontFamily: "Sora" }}
-        >
-          Supprimer le document
-        </h3>
-      </div>
+          <div
+            className="relative rounded-3xl shadow-2xl p-8 w-full mx-4"
+            style={{ background: "var(--surface)", maxWidth: "420px", zIndex: 51 }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-2xl">⚠️</span>
+              <h3
+                className="text-lg font-bold"
+                style={{ color: "var(--text)", fontFamily: "Sora" }}
+              >
+                Supprimer le document
+              </h3>
+            </div>
 
-      <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
-        Voulez-vous vraiment supprimer le document{" "}
-        <strong>{docToDelete.nom}</strong> ?
-        <br />
-        Cette action est irréversible.
-      </p>
+            <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
+              Voulez-vous vraiment supprimer le document{" "}
+              <strong>{docToDelete.nom}</strong> ?
+              <br />
+              Cette action est irréversible.
+            </p>
 
-      <div className="flex gap-3 justify-end">
-        <button
-          type="button"
-          onClick={() => setDocToDelete(null)}
-          className="btn-secondary px-5 py-2.5"
-        >
-          Annuler
-        </button>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setDocToDelete(null)}
+                className="btn-secondary px-5 py-2.5"
+              >
+                Annuler
+              </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            deleteMutation.mutate(docToDelete.id);
-            setDocToDelete(null);
-          }}
-          className="px-5 py-2.5 rounded-xl font-semibold"
-          style={{ background: "#dc2626", color: "white" }}
-        >
-          Supprimer
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+              <button
+                type="button"
+                onClick={() => {
+                  deleteMutation.mutate(docToDelete.id);
+                  setDocToDelete(null);
+                }}
+                className="px-5 py-2.5 rounded-xl font-semibold"
+                style={{ background: "#dc2626", color: "white" }}
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

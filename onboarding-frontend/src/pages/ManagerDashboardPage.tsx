@@ -1,11 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUserApi, getMyTeamApi, getAffectationByUserApi, getPositionsApi } from "../api/authApi";
+import { getCurrentUserApi, getMyTeamApi, getAffectationByUserApi, getPositionsApi, getAllAffectationsApi } from "../api/authApi";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../context/ThemeContext";
-import { type Position, type User } from "../types/auth";
+import { type Position, type User, type Affectation} from "../types/auth";
 import Sidebar from "../components/Sidebar";
 import CompanyDocumentsWidget from "../components/CompanyDocumentsWidget";
+import { useMemo, useState } from "react";
 
 const statutConfig: Record<string, { label: string; color: string; bg: string }> = {
   EN_ATTENTE: { label: "En attente",   color: "#d97706", bg: "#fffbeb" },
@@ -19,6 +20,14 @@ const ManagerDashboardPage = () => {
   const navigate = useNavigate();
   const { email, userId } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const queryClient = useQueryClient();
+
+  // ⭐ États pour les messages et filtres
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showDisabled, setShowDisabled] = useState(false);
+
 
   const { data: manager } = useQuery({
     queryKey: ["currentUser"],
@@ -41,6 +50,35 @@ const ManagerDashboardPage = () => {
     enabled: !!userId,
     retry: false,
   });
+
+// ⭐ Récupérer toutes les affectations pour connaître le poste de chaque salarié
+const { data: allAffectations = [] } = useQuery({
+  queryKey: ["allAffectations"],
+  queryFn: getAllAffectationsApi,
+  enabled: true,
+});
+
+    // ⭐ Créer un mapping userId -> poste
+const userPosteMap = useMemo(() => {
+  const map = new Map<string, string>();
+  allAffectations.forEach((affectation: Affectation) => {
+    const position = positions.find((p: Position) => p.id === affectation.positionId);
+    if (position) {
+      map.set(affectation.userId, position.titre);
+    }
+  });
+  return map;
+}, [allAffectations, positions]);
+
+  const handleRefresh = () => {
+    setSuccessMsg("");
+    setErrorMsg("");
+    queryClient.invalidateQueries({ queryKey: ["myTeam"] });
+    setSearchQuery("");
+    setShowDisabled(false);
+    setSuccessMsg("Tableau actualisé !");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
 
   const profileIncomplete = (manager?.profilCompletion ?? 0) < 100;
   const teamList = team ?? [];
@@ -234,6 +272,23 @@ const ManagerDashboardPage = () => {
                     Mon équipe
                   </h2>
                 </div>
+                 <div className="flex items-center gap-3 flex-wrap">
+                  {/* ⭐ Bouton Actualiser */}
+                  <button
+                    onClick={handleRefresh}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:scale-105"
+                    style={{ background: "var(--border)", color: "var(--text)" }}
+                    title="Actualiser le tableau"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M23 4v6h-6" />
+                      <path d="M1 20v-6h6" />
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+                      <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+                    </svg>
+                  </button>
+                </div>
+              
                 <button type="button"
                   onClick={() => navigate("/manager/equipe")}
                   className="text-sm font-semibold px-4 py-2 rounded-xl transition hover:scale-105"
@@ -258,7 +313,7 @@ const ManagerDashboardPage = () => {
                 <table className="w-full text-sm">
                   <thead>
                     <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                      {["Employé", "Statut", "Progression", ""].map((h) => (
+                      {["Employé", "Statut", "Progression","Poste", ""].map((h) => (
                         <th key={h} className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide"
                           style={{ color: "var(--text-muted)" }}>{h}</th>
                       ))}
@@ -267,6 +322,7 @@ const ManagerDashboardPage = () => {
                   <tbody>
                     {teamList.slice(0, 5).map((u: User) => {
                       const s = statutConfig[u.statutCompte];
+                      const userPoste = userPosteMap.get(u.id); 
                       return (
                         <tr key={u.id} className="transition hover:bg-[var(--bg)]"
                           style={{ borderBottom: "1px solid var(--border)" }}>
@@ -305,6 +361,18 @@ const ManagerDashboardPage = () => {
                               </span>
                             </div>
                           </td>
+                          <td className="px-5 py-4">
+          {userPoste ? (
+            <span className="text-xs px-2 py-1 rounded-lg font-medium"
+              style={{ background: "rgba(0,174,239,0.08)", color: "#00AEEF", border: "1px solid rgba(0,174,239,0.15)" }}>
+              💼 {userPoste}
+            </span>
+          ) : (
+            <span className="text-xs italic" style={{ color: "var(--text-muted)" }}>
+              Non affecté
+            </span>
+          )}
+        </td>
                           <td className="px-5 py-4">
                             <button type="button"
                               onClick={() => navigate(`/manager/salarie/${u.id}`)}

@@ -12,8 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/parcours")
@@ -72,29 +71,79 @@ public class ParcoursController {
     @GetMapping("/my-team")
     @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<?> getTeamParcours(Authentication auth) {
-        String email = auth.getName();
-        com.onboarding.backend.model.User manager = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Manager introuvable."));
+        try {
+            // Check if authentication is valid
+            if (auth == null || auth.getName() == null) {
+                return ResponseEntity.status(401).body("Authentication required");
+            }
 
-        List<com.onboarding.backend.model.Affectation> affectations =
-                affectationRepository.findAllByManagerId(manager.getId());
+            String email = auth.getName();
+            com.onboarding.backend.model.User manager = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Manager introuvable."));
 
-        List<Map<String, Object>> result = affectations.stream()
-                .map(a -> {
-                    com.onboarding.backend.model.User salarie =
-                            userRepository.findById(a.getUserId()).orElse(null);
-                    Parcours parcours = parcoursRepository.findByUserId(a.getUserId()).orElse(null);
-                    List<Task> tasks = parcours != null
-                            ? taskRepository.findByParcoursIdOrderByOrdreAsc(parcours.getId())
-                            : List.of();
-                    return Map.<String, Object>of(
-                            "salarie", salarie,
-                            "parcours", parcours != null ? parcours : Map.of(),
-                            "tasks", tasks
-                    );
-                })
-                .toList();
+            // Get affectations - this might be null or empty
+            List<com.onboarding.backend.model.Affectation> affectations =
+                    affectationRepository.findAllByManagerId(manager.getId());
 
-        return ResponseEntity.ok(result);
+            // Handle null affectations
+            if (affectations == null) {
+                affectations = new ArrayList<>();
+            }
+
+            // Build response with null safety
+            List<Map<String, Object>> result = affectations.stream()
+                    .map(a -> {
+                        try {
+                            // Get salarie with null check
+                            com.onboarding.backend.model.User salarie = null;
+                            if (a.getUserId() != null) {
+                                salarie = userRepository.findById(a.getUserId()).orElse(null);
+                            }
+
+                            // Skip if salarie is null (no user found)
+                            if (salarie == null) {
+                                return null;
+                            }
+
+                            // Get parcours with null check
+                            Parcours parcours = null;
+                            if (salarie.getId() != null) {
+                                parcours = parcoursRepository.findByUserId(salarie.getId()).orElse(null);
+                            }
+
+                            // Get tasks with null check
+                            List<Task> tasks = new ArrayList<>();
+                            if (parcours != null && parcours.getId() != null) {
+                                tasks = taskRepository.findByParcoursIdOrderByOrdreAsc(parcours.getId());
+                                if (tasks == null) {
+                                    tasks = new ArrayList<>();
+                                }
+                            }
+
+                            // Build the response map
+                            Map<String, Object> memberData = new HashMap<>();
+                            memberData.put("salarie", salarie);
+                            memberData.put("parcours", parcours != null ? parcours : new HashMap<>());
+                            memberData.put("tasks", tasks);
+
+                            return memberData;
+
+                        } catch (Exception e) {
+                            // Log the error for a specific member
+                            System.err.println("Error processing affectation: " + e.getMessage());
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull) // Remove null entries
+                    .toList();
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            // Log the full error for debugging
+            e.printStackTrace();
+            return ResponseEntity.status(500)
+                    .body("Erreur lors de la récupération de l'équipe: " + e.getMessage());
+        }
     }
 }

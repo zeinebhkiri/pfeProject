@@ -33,6 +33,7 @@ export interface CreateEmployeeRequest {
   email: string;
   role: UserRole;
   joursLimite: number;
+  dateEmbauche: string;
 }
 
 export interface ProfileUpdateRequest {
@@ -84,6 +85,8 @@ export interface ProfessionalInfo {
   emailProfessionnel?: string
   telephoneProfessionnel?: string
   dateEmbauche?: string
+  datePriseDePoste?: string;          
+  datePriseDePostePersonnalisee?: boolean;
 }
 export interface Affectation {
   id: string;
@@ -175,7 +178,7 @@ export interface TaskTemplate {
   titre: string;
   description?: string;
   taskType: TaskType;
-  typeActeur: TypeActeur;
+  typeActeurs: TypeActeur[];
   ordre: number;
   obligatoire: boolean;
   delaiJours: number;
@@ -197,6 +200,13 @@ export interface TaskCommentaire {
   date: string;
 }
 
+export interface ActeurProgression{
+        typeActeur: TypeActeur;
+        acteurId: string;
+        complete: boolean;
+        dateCompletion: string;
+}
+
 export interface Task {
   id: string;
   parcoursId: string;
@@ -204,8 +214,10 @@ export interface Task {
   titre: string;
   description?: string;
   taskType: TaskType;
-  typeActeur: TypeActeur;
-  acteurId?: string;
+  typeActeurs: TypeActeur[];
+  acteurIds?: string[];
+  dateOuverture?: string;
+  acteurProgressions?: ActeurProgression[];
   ordre: number;
   obligatoire: boolean;
   verrouille: boolean;

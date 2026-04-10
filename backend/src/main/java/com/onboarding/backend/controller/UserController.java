@@ -33,6 +33,7 @@ public class UserController {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final AffectationRepository affectationRepository;
+
     // ── Mon profil ──────────────────────────────────────────────────────────
     @GetMapping("/me")
     public ResponseEntity<User> getCurrentUser(Authentication authentication) {
@@ -52,7 +53,6 @@ public class UserController {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // Mettre à jour le profil
         if (user.getProfile() == null) user.setProfile(new User.Profile());
         user.getProfile().setAdresse(request.getAdresse());
         user.getProfile().setRib(request.getRib());
@@ -66,23 +66,32 @@ public class UserController {
         user.getProfile().setGenre(request.getGenre());
         if (request.getDateNaissance() != null && !request.getDateNaissance().isBlank()) {
             user.getProfile().setDateNaissance(LocalDate.parse(request.getDateNaissance()));
-            user.getProfile().setPhotoPoste(request.getPhotoPoste()); // ← AJOUTER
+            user.getProfile().setPhotoPoste(request.getPhotoPoste());
         }
-        // Calculer le profilCompletion
         user.setProfilCompletion(calculerCompletion(user));
-
         userRepository.save(user);
         return ResponseEntity.ok(user);
     }
 
-    // ── Liste tous les utilisateurs — ADMIN uniquement ──────────────────────
+    // ── Liste tous les utilisateurs — ADMIN uniquement (exclut les DESACTIVE) ──
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<User>> getAllUsers() {
+        // ⭐ MODIFICATION 1: Exclure les comptes désactivés
+        List<User> activeUsers = userRepository.findAll().stream()
+                .filter(user -> user.getStatutCompte() != StatutCompte.DESACTIVE)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(activeUsers);
+    }
+
+    // ⭐ NOUVEAU: Endpoint pour récupérer TOUS les utilisateurs (y compris désactivés) - ADMIN seulement
+    @GetMapping("/all-including-disabled")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<User>> getAllUsersIncludingDisabled() {
         return ResponseEntity.ok(userRepository.findAll());
     }
 
-    // ── Voir le profil d'un salarié — ADMIN uniquement ──────────────────────
+    // ── Voir le profil d'un salarié — ADMIN ou MANAGER ──────────────────────
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public ResponseEntity<User> getUserById(@PathVariable String id) {
@@ -99,6 +108,9 @@ public class UserController {
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
         if (user.getProfilCompletion() < 100) {
+            int documentCount = user.getProfile() != null && user.getProfile().getDocuments() != null
+                    ? user.getProfile().getDocuments().size()
+                    : 0;
             return ResponseEntity.badRequest().body(
                     Map.of("error", "Le profil n'est pas complété à 100%. Completion actuelle : " + user.getProfilCompletion() + "%")
             );
@@ -121,35 +133,38 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Compte désactivé."));
     }
 
-    // ── Liste tous les SALARIES ──────────────────────────────────────────────
+    // ── Liste tous les SALARIES (exclut les DESACTIVE) ──────────────────────
     @GetMapping("/salaries")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<List<User>> getAllSalaries() {
-        return ResponseEntity.ok(userRepository.findByRole(Role.SALARIE));
+        // ⭐ MODIFICATION 2: Exclure les comptes désactivés
+        List<User> activeSalaries = userRepository.findByRole(Role.SALARIE).stream()
+                .filter(user -> user.getStatutCompte() != StatutCompte.DESACTIVE)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(activeSalaries);
     }
 
-    // ── Liste tous les MANAGERS — ADMIN uniquement ───────────────────────────
+    // ── Liste tous les MANAGERS (exclut les DESACTIVE) — ADMIN uniquement ───
     @GetMapping("/managers")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<User>> getAllManagers() {
-        return ResponseEntity.ok(userRepository.findByRole(Role.MANAGER));
+        // ⭐ MODIFICATION 3: Exclure les comptes désactivés
+        List<User> activeManagers = userRepository.findByRole(Role.MANAGER).stream()
+                .filter(user -> user.getStatutCompte() != StatutCompte.DESACTIVE)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(activeManagers);
     }
-
 
     // ── Calcul du taux de complétion ─────────────────────────────────────────
     private int calculerCompletion(User user) {
-
         if (user.getProfile() == null) return 0;
-
-        int total = 10;
+        int total = 13;
         int remplis = 0;
-
         User.Profile p = user.getProfile();
 
         if (p.getAdresse() != null && !p.getAdresse().isBlank()) remplis++;
         if (p.getRib() != null && !p.getRib().isBlank()) remplis++;
         if (p.getTelephone() != null && !p.getTelephone().isBlank()) remplis++;
-
         if (p.getNumeroCnss() != null && !p.getNumeroCnss().isBlank()) remplis++;
         if (p.getDateNaissance() != null) remplis++;
         if (p.getLieuNaissance() != null && !p.getLieuNaissance().isBlank()) remplis++;
@@ -158,16 +173,22 @@ public class UserController {
         if (p.getNationalite() != null && !p.getNationalite().isBlank()) remplis++;
         if (p.getGenre() != null && !p.getGenre().isBlank()) remplis++;
 
+        int documentCount = p.getDocuments() != null ? p.getDocuments().size() : 0;
+        if (documentCount >= 3) {
+            remplis += 3;
+        } else {
+            remplis += documentCount;
+        }
         return (remplis * 100) / total;
     }
-    // ── DTO ─────────────────────────────────────────────────────────────────────
+
+    // ── DTO ─────────────────────────────────────────────────────────────────
     @Data
     public static class CorrectionRequest {
         private String commentaire;
-        private String dateLimite; // format "dd/MM/yyyy"
     }
 
-    // ── Envoyer email de correction — ADMIN ─────────────────────────────────────
+    // ── Envoyer email de correction — ADMIN ─────────────────────────────────
     @PostMapping("/{id}/send-correction-email")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> sendCorrectionEmail(
@@ -179,27 +200,31 @@ public class UserController {
         emailService.sendCorrectionEmail(
                 user.getEmail(),
                 user.getPrenom() + " " + user.getNom(),
-                request.getCommentaire(),
-                request.getDateLimite()
+                request.getCommentaire()
         );
-
         return ResponseEntity.ok(Map.of("message", "Email de correction envoyé avec succès."));
     }
+
+    // ── Récupérer l'équipe d'un manager (exclut les DESACTIVE) ──────────────
     @GetMapping("/my-team")
     @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<?> getMyTeam(@AuthenticationPrincipal UserDetails userDetails) {
         User manager = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("Manager introuvable"));
 
-
         List<Affectation> affectations = affectationRepository.findAllByManagerId(manager.getId());
         List<String> userIds = affectations.stream()
                 .map(Affectation::getUserId)
                 .collect(Collectors.toList());
 
-        List<User> team = userRepository.findAllById(userIds);
+        // ⭐ MODIFICATION 4: Exclure les comptes désactivés de l'équipe
+        List<User> team = userRepository.findAllById(userIds).stream()
+                .filter(user -> user.getStatutCompte() != StatutCompte.DESACTIVE)
+                .collect(Collectors.toList());
+
         return ResponseEntity.ok(team);
     }
+
     // ── DTO interne pour la mise à jour du profil ────────────────────────────
     @Data
     public static class ProfileUpdateRequest {
@@ -216,12 +241,13 @@ public class UserController {
         private String genre;
         private String photoPoste;
     }
+
     // ── DTO Document ─────────────────────────────────────────────────────────
     @Data
     public static class DocumentUploadRequest {
         private String nom;
         private String type;
-        private String contenu;   // base64
+        private String contenu;
         private String mimeType;
     }
 
@@ -248,9 +274,9 @@ public class UserController {
         doc.setDateUpload(LocalDateTime.now());
 
         user.getProfile().getDocuments().add(doc);
+        user.setProfilCompletion(calculerCompletion(user));
         userRepository.save(user);
 
-        // Retourner sans le contenu base64 pour alléger la réponse
         doc.setContenu(null);
         return ResponseEntity.ok(doc);
     }
@@ -268,9 +294,9 @@ public class UserController {
         if (user.getProfile() != null && user.getProfile().getDocuments() != null) {
             user.getProfile().getDocuments()
                     .removeIf(d -> d.getId().equals(docId));
+            user.setProfilCompletion(calculerCompletion(user));
             userRepository.save(user);
         }
-
         return ResponseEntity.ok(Map.of("message", "Document supprimé."));
     }
 
@@ -293,7 +319,8 @@ public class UserController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-    // Mettre à jour le profil (les informations profissionnels)
+
+    // ── Mettre à jour les informations professionnelles ──────────────────────
     @PutMapping("/{id}/professional-info")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<User> updateProfessionalInfo(@PathVariable String id, @RequestBody ProfessionalInfoRequest request) {
@@ -308,23 +335,31 @@ public class UserController {
         user.getProfessionalInfo().setEmailProfessionnel(request.getEmailProfessionnel());
         user.getProfessionalInfo().setTelephoneProfessionnel(request.getTelephoneProfessionnel());
 
-        if(request.getDateEmbauche()!=null && !request.getDateEmbauche().isBlank()){
-            user.getProfessionalInfo().setDateEmbauche(
-                    LocalDate.parse(request.getDateEmbauche())
-            );
+        if (request.getDateEmbauche() != null && !request.getDateEmbauche().isBlank()) {
+            LocalDate newEmbauche = LocalDate.parse(request.getDateEmbauche());
+            user.getProfessionalInfo().setDateEmbauche(newEmbauche);
+            if (!user.getProfessionalInfo().isDatePriseDePostePersonnalisee()) {
+                user.getProfessionalInfo().setDatePriseDePoste(newEmbauche);
+            }
+        }
+
+        if (request.getDatePriseDePoste() != null && !request.getDatePriseDePoste().isBlank()) {
+            user.getProfessionalInfo().setDatePriseDePoste(LocalDate.parse(request.getDatePriseDePoste()));
+            user.getProfessionalInfo().setDatePriseDePostePersonnalisee(true);
+        } else if (request.getDateEmbauche() != null && !request.getDateEmbauche().isBlank()
+                && !user.getProfessionalInfo().isDatePriseDePostePersonnalisee()) {
+            user.getProfessionalInfo().setDatePriseDePoste(LocalDate.parse(request.getDateEmbauche()));
         }
 
         userRepository.save(user);
-
         return ResponseEntity.ok(user);
     }
+
     @Data
     public static class ProfessionalInfoRequest {
-
         private String emailProfessionnel;
         private String telephoneProfessionnel;
         private String dateEmbauche;
-
+        private String datePriseDePoste;
     }
-
 }

@@ -26,4 +26,5 @@ public class CreateEmployeeRequest {
     @NotNull(message = "Le nombre de jours limite est obligatoire")
     @Min(value = 1, message = "Minimum 1 jour")
     private Integer joursLimite;
+    private String dateEmbauche;
 }

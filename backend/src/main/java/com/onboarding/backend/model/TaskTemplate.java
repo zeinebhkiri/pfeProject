@@ -20,7 +20,7 @@ public class TaskTemplate {
     private String titre;
     private String description;
     private TaskType taskType;
-    private TypeActeur typeActeur;
+    private List<TypeActeur> typeActeurs;
     private int ordre;
     private boolean obligatoire = true;
     private int delaiJours; // délai en jours depuis le début du parcours

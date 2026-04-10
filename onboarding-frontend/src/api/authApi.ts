@@ -105,6 +105,7 @@ export const createAffectationApi = async (data: {
   userId: string;
   positionId: string;  // ← remplace poste
   managerId?: string;
+  datePriseDePoste?: string; 
 }): Promise<Affectation> => {
   const res = await api.post<Affectation>("/affectations", data);
   return res.data;
@@ -112,6 +113,10 @@ export const createAffectationApi = async (data: {
 export const getAffectationByUserApi = async (userId: string): Promise<Affectation> => {
   const res = await api.get<Affectation>(`/affectations/user/${userId}`);
   return res.data;
+};
+
+export const getAllAffectationsApi = () => {
+  return api.get('/affectations').then(res => res.data);
 };
 
 export const getAllManagersApi = async (): Promise<User[]> => {

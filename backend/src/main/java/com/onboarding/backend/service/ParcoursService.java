@@ -7,7 +7,9 @@ import com.onboarding.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,6 +22,7 @@ public class ParcoursService {
     private final ParcoursTemplateRepository parcoursTemplateRepository;
     private final TaskTemplateRepository taskTemplateRepository;
     private final AffectationRepository affectationRepository;
+    private final UserRepository userRepository;
 
     // ── Générer un parcours lors d'une affectation ──────────────────────────
     public Parcours genererParcours(String userId, String positionId, String managerId) {
@@ -59,29 +62,65 @@ public class ParcoursService {
             task.setTitre(tt.getTitre());
             task.setDescription(tt.getDescription());
             task.setTaskType(tt.getTaskType());
-            task.setTypeActeur(tt.getTypeActeur());
+            task.setTypeActeurs(tt.getTypeActeurs());
             task.setOrdre(tt.getOrdre());
             task.setObligatoire(tt.isObligatoire());
             task.setConfig(tt.getConfig());
             task.setStatut(Task.StatutTask.NON_COMMENCE);
             task.setNbTentatives(0);
             task.setProgression(0);
+            task.setVerrouille(false); // Par défaut, non verrouillé
 
             // Assigner l'acteur
-            if (tt.getTypeActeur() == TypeActeur.MANAGER) {
-                task.setActeurId(managerId);
-            } else if (tt.getTypeActeur() == TypeActeur.RH) {
-                task.setActeurId(null); // sera géré par l'admin
-            } else {
-                task.setActeurId(userId); // SALARIE
+            List<String> acteurIds = new ArrayList<>();
+            for (TypeActeur acteur : tt.getTypeActeurs()) {
+                if (acteur == TypeActeur.MANAGER) acteurIds.add(managerId);
+                else if (acteur == TypeActeur.SALARIE) acteurIds.add(userId);
+                // RH → null, any admin handles it
+            }
+            task.setActeurIds(acteurIds);
+
+            // Init acteurProgressions
+            List<Task.ActeurProgression> progressions = new ArrayList<>();
+            for (TypeActeur acteur : tt.getTypeActeurs()) {
+                Task.ActeurProgression ap = new Task.ActeurProgression();
+                ap.setTypeActeur(acteur);
+                ap.setComplete(false);
+                progressions.add(ap);
+            }
+            task.setActeurProgressions(progressions);
+
+            // Récupérer la date de référence
+            LocalDate refDate = LocalDate.now(); // fallback
+            User u = userRepository.findById(userId).orElse(null);
+            if (u != null && u.getProfessionalInfo() != null) {
+                // Priorité : datePriseDePoste → dateEmbauche → today
+                if (u.getProfessionalInfo().getDatePriseDePoste() != null) {
+                    refDate = u.getProfessionalInfo().getDatePriseDePoste();
+                } else if (u.getProfessionalInfo().getDateEmbauche() != null) {
+                    refDate = u.getProfessionalInfo().getDateEmbauche();
+                }
             }
 
-            // Calculer l'échéance
+            // ⭐ NOUVEAU: Gérer l'ouverture à J+1 uniquement pour les QUIZ
+            if (tt.getTaskType() == TaskType.QUIZ) {
+                // Date d'ouverture = refDate + 1 jour
+                LocalDateTime dateOuverture = refDate.plusDays(1).atStartOfDay();
+                task.setDateOuverture(dateOuverture);
+
+                // Verrouiller si la date d'ouverture n'est pas encore atteinte
+                task.setVerrouille(dateOuverture.isAfter(LocalDateTime.now()));
+            }
+
+            // Calculer l'échéance (pour tous les types)
             if (tt.getDelaiJours() > 0) {
-                task.setEcheance(LocalDateTime.now().plusDays(tt.getDelaiJours()));
+                task.setEcheance(refDate.plusDays(tt.getDelaiJours()).atStartOfDay());
+            }
+            if (tt.getDelaiJours() < 0) {
+                task.setEcheance(refDate.minusDays(tt.getDelaiJours()).atStartOfDay());
             }
 
-            // Verrouiller l'entretien par défaut
+            // Verrouiller l'entretien par défaut (priorité sur la logique ci-dessus)
             if (tt.getTaskType() == TaskType.ENTRETIEN) {
                 task.setVerrouille(true);
             }

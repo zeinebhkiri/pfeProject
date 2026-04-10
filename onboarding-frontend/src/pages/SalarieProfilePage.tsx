@@ -9,6 +9,7 @@ import {
   getAllManagersApi,
   sendCorrectionEmailApi,
   getPositionsApi,
+  updateProfessionalInfoApi,
 } from "../api/authApi";
 import { type User, type Position } from "../types/auth";
 import Sidebar from "../components/Sidebar";
@@ -29,22 +30,27 @@ const SalarieProfilePage = () => {
   const { role } = useAuth();
   const queryClient = useQueryClient();
 
-  const [successMsg, setSuccessMsg]             = useState("");
-  const [errorMsg, setErrorMsg]                 = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
   const [correctionSuccess, setCorrectionSuccess] = useState("");
 
   const [affectationPositionId, setAffectationPositionId] = useState("");
-  const [affectationManagerId, setAffectationManagerId]   = useState("");
-  const [modifyAffectation, setModifyAffectation]         = useState(false);
+  const [affectationManagerId, setAffectationManagerId] = useState("");
+  const [modifyAffectation, setModifyAffectation] = useState(false);
 
-  const [showCorrectionModal, setShowCorrectionModal]   = useState(false);
-  const [commentaire, setCommentaire]                   = useState("");
+  const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+  const [commentaire, setCommentaire] = useState("");
   const [dateLimiteCorrection, setDateLimiteCorrection] = useState("");
 
-  const [professionalEmail, setProfessionalEmail]       = useState("");
-  const [professionalPhone, setProfessionalPhone]       = useState("");
+  const [professionalEmail, setProfessionalEmail] = useState("");
+  const [professionalPhone, setProfessionalPhone] = useState("");
   const [professionalHireDate, setProfessionalHireDate] = useState("");
   const [modifyProfessionalInfo, setModifyProfessionalInfo] = useState(false);
+  const [datePriseDePoste, setDatePriseDePoste] = useState("");
+  const [affectationDatePriseDePoste, setAffectationDatePriseDePoste] = useState("");
+  
+  // ⚡ Ajout d'un état pour savoir si la date est personnalisée
+  const [isDatePrisePostePersonnalisee, setIsDatePrisePostePersonnalisee] = useState(false);
 
   // ── Queries ──────────────────────────────────────────────────────────────
   const { data: user, isLoading } = useQuery({
@@ -72,14 +78,45 @@ const SalarieProfilePage = () => {
     enabled: !!user && user.statutCompte === "VALIDE",
   });
 
-  // ── Effects ──────────────────────────────────────────────────────────────
+  // ── Effet principal d'initialisation ──────────────────────────────────────────────
   useEffect(() => {
     if (user?.professionalInfo) {
+      console.log("Initialisation des données professionnelles:", user.professionalInfo);
+      
+      // Email et téléphone
       setProfessionalEmail(user.professionalInfo.emailProfessionnel || "");
       setProfessionalPhone(user.professionalInfo.telephoneProfessionnel || "");
-      setProfessionalHireDate(user.professionalInfo.dateEmbauche || "");
+      
+      // Date d'embauche
+      const hireDate = user.professionalInfo.dateEmbauche || "";
+      setProfessionalHireDate(hireDate);
+      
+      // Date de prise de poste - priorité à la date personnalisée
+      let prisePoste = user.professionalInfo.datePriseDePoste || "";
+      
+      // Si pas de date de prise de poste mais date d'embauche existe, utiliser date d'embauche
+      if (!prisePoste && hireDate) {
+        prisePoste = hireDate;
+        setIsDatePrisePostePersonnalisee(false);
+        console.log("Date prise de poste initialisée avec date d'embauche:", prisePoste);
+      } else if (prisePoste) {
+        setIsDatePrisePostePersonnalisee(true);
+        console.log("Date prise de poste personnalisée existante:", prisePoste);
+      }
+      
+      setDatePriseDePoste(prisePoste);
+      setAffectationDatePriseDePoste(prisePoste);
     }
   }, [user?.professionalInfo]);
+
+  // ── Synchronisation auto : quand date d'embauche change ──
+  useEffect(() => {
+    if (professionalHireDate && !isDatePrisePostePersonnalisee) {
+      console.log("Sync auto: date prise de poste = date embauche:", professionalHireDate);
+      setDatePriseDePoste(professionalHireDate);
+      setAffectationDatePriseDePoste(professionalHireDate);
+    }
+  }, [professionalHireDate, isDatePrisePostePersonnalisee]);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const validateMutation = useMutation({
@@ -112,6 +149,7 @@ const SalarieProfilePage = () => {
         userId: id!,
         positionId: affectationPositionId,
         managerId: user?.role === "MANAGER" ? undefined : affectationManagerId,
+        datePriseDePoste: affectationDatePriseDePoste || undefined,
       }),
     onSuccess: () => {
       setSuccessMsg("Affectation créée avec succès !");
@@ -126,38 +164,53 @@ const SalarieProfilePage = () => {
   });
 
   const professionalMutation = useMutation({
-    mutationFn: (data: any) => fetch(`/api/users/${id}/professional-info`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: JSON.stringify(data),
-    }).then(r => r.json()),
-    onSuccess: () => {
+    mutationFn: (data: any) => updateProfessionalInfoApi(id!, data),
+    onSuccess: (updatedUser) => {
       setSuccessMsg("Informations professionnelles mises à jour !");
       setModifyProfessionalInfo(false);
       queryClient.invalidateQueries({ queryKey: ["userById", id] });
     },
-    onError: () => {
-      setErrorMsg("Erreur lors de la mise à jour.");
+    onError: (error: any) => {
+      setErrorMsg(error.response?.data?.error || "Erreur lors de la mise à jour.");
     },
   });
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const handleProfessionalInfoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Si la date de prise de poste est différente de la date d'embauche, marquer comme personnalisée
+    const isPersonnalisee = datePriseDePoste !== professionalHireDate;
+    setIsDatePrisePostePersonnalisee(isPersonnalisee);
+    
+    console.log("Soumission formulaire:", {
+      dateEmbauche: professionalHireDate,
+      datePriseDePoste: datePriseDePoste,
+      personnalisee: isPersonnalisee
+    });
+    
     professionalMutation.mutate({
       emailProfessionnel: professionalEmail,
       telephoneProfessionnel: professionalPhone,
       dateEmbauche: professionalHireDate,
+      datePriseDePoste: datePriseDePoste,
     });
   };
 
   const resetProfessionalForm = () => {
+    const hireDate = user?.professionalInfo?.dateEmbauche || "";
+    let prisePoste = user?.professionalInfo?.datePriseDePoste || "";
+    
+    if (!prisePoste && hireDate) {
+      prisePoste = hireDate;
+    }
+    
     setProfessionalEmail(user?.professionalInfo?.emailProfessionnel || "");
     setProfessionalPhone(user?.professionalInfo?.telephoneProfessionnel || "");
-    setProfessionalHireDate(user?.professionalInfo?.dateEmbauche || "");
+    setProfessionalHireDate(hireDate);
+    setDatePriseDePoste(prisePoste);
+    setAffectationDatePriseDePoste(prisePoste);
+    setIsDatePrisePostePersonnalisee(!!user?.professionalInfo?.datePriseDePoste);
   };
 
   // Résoudre le titre du poste depuis positionId
@@ -334,7 +387,7 @@ const SalarieProfilePage = () => {
                   </div>
                 )}
 
-                {user.statutCompte === "ACCEPTE" && (
+                {user.statutCompte === "ACCEPTE" && completion === 100 && (
                   <button type="button"
                     onClick={() => setShowCorrectionModal(true)}
                     className="w-full py-2.5 rounded-xl text-sm font-semibold transition"
@@ -453,12 +506,26 @@ const SalarieProfilePage = () => {
                   {!modifyProfessionalInfo ? (
                     <div className="grid grid-cols-2 gap-4">
                       {[
-                        { label: "Email professionnel",      value: user.professionalInfo?.emailProfessionnel,      icon: "✉️" },
-                        { label: "Téléphone professionnel",  value: user.professionalInfo?.telephoneProfessionnel,  icon: "📱" },
-                        { label: "Date d'embauche",          value: user.professionalInfo?.dateEmbauche
+                        { label: "Email professionnel", value: user.professionalInfo?.emailProfessionnel, icon: "✉️" },
+                        { label: "Téléphone professionnel", value: user.professionalInfo?.telephoneProfessionnel, icon: "📱" },
+                        { 
+                          label: "Date d'embauche", 
+                          value: user.professionalInfo?.dateEmbauche
                             ? new Date(user.professionalInfo.dateEmbauche).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
                             : undefined,
-                          icon: "📅" },
+                          icon: "📅" 
+                        },
+                        { 
+                          label: "Date de prise de poste",   
+                          value: (() => {
+                            const date = user.professionalInfo?.datePriseDePoste || user.professionalInfo?.dateEmbauche;
+                            return date
+                              ? new Date(date).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+                              : undefined;
+                          })(),
+                          icon: "📅",
+                          note: !user.professionalInfo?.datePriseDePoste && user.professionalInfo?.dateEmbauche ? "(synchronisée)" : ""
+                        },
                       ].map((item, index) => (
                         <div key={index} className="p-4 rounded-xl"
                           style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
@@ -468,9 +535,10 @@ const SalarieProfilePage = () => {
                               {item.label}
                             </span>
                           </div>
-                          <p className={`text-sm font-medium ${item.value ? "" : "italic"}`}
+                          <p className={`text-sm font-medium ${!item.value ? "italic" : ""}`}
                             style={{ color: item.value ? "var(--text)" : "var(--text-muted)" }}>
                             {item.value || "Non renseigné"}
+                            {item.note && <span className="text-xs ml-1" style={{ color: "#8DC63F" }}>{item.note}</span>}
                           </p>
                         </div>
                       ))}
@@ -503,9 +571,51 @@ const SalarieProfilePage = () => {
                             style={{ color: "var(--text-muted)" }}>
                             Date d'embauche
                           </label>
-                          <input type="date" value={professionalHireDate}
+                          <input 
+                            type="date" 
+                            value={professionalHireDate}
                             onChange={(e) => setProfessionalHireDate(e.target.value)}
-                            className="input-field" />
+                            className="input-field" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide"
+                            style={{ color: "var(--text-muted)" }}>
+                            Date de prise de poste
+                            {!isDatePrisePostePersonnalisee && professionalHireDate && (
+                              <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-medium normal-case"
+                                style={{ background: "rgba(141,198,63,0.1)", color: "#8DC63F" }}>
+                                Sync auto avec date d'embauche
+                              </span>
+                            )}
+                            {isDatePrisePostePersonnalisee && (
+                              <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-medium normal-case"
+                                style={{ background: "rgba(0,174,239,0.1)", color: "#00AEEF" }}>
+                                Personnalisée
+                              </span>
+                            )}
+                          </label>
+                          <input
+                            type="date"
+                            value={datePriseDePoste}
+                            onChange={(e) => {
+                              setDatePriseDePoste(e.target.value);
+                              // Marquer comme personnalisée si différente de la date d'embauche
+                              if (e.target.value !== professionalHireDate) {
+                                setIsDatePrisePostePersonnalisee(true);
+                              }
+                            }}
+                            className="input-field"
+                          />
+                          <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                            {!datePriseDePoste && professionalHireDate ? (
+                              `📌 Actuellement synchronisée avec la date d'embauche (${new Date(professionalHireDate).toLocaleDateString("fr-FR")})`
+                            ) : datePriseDePoste ? (
+                              `📅 Date définie: ${new Date(datePriseDePoste).toLocaleDateString("fr-FR")}`
+                            ) : (
+                              "⚠️ Aucune date définie. La date d'embauche sera utilisée."
+                            )}
+                          </p>
                         </div>
                         <div className="flex gap-3 pt-2">
                           <button type="submit" disabled={professionalMutation.isPending}
@@ -566,6 +676,8 @@ const SalarieProfilePage = () => {
                                 ? `${managers.find((m: User) => m.id === affectation.managerId)!.prenom} ${managers.find((m: User) => m.id === affectation.managerId)!.nom}`
                                 : affectation.managerId
                               : "Aucun (Manager)" },
+                               { label: "Date de prise de poste",
+                            value: new Date(affectationDatePriseDePoste || professionalHireDate || "").toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) },
                           { label: "Date d'affectation",
                             value: new Date(affectation.dateAffectation).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) },
                         ].map((f) => (
@@ -635,6 +747,33 @@ const SalarieProfilePage = () => {
                         </div>
                       )}
 
+                      <div>
+                        <label 
+                          htmlFor="datePrisePoste"
+                          className="block text-xs font-semibold mb-1.5 uppercase tracking-wide"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Date de prise de poste
+                          <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-medium normal-case"
+                            style={{ background: "rgba(0,174,239,0.08)", color: "#00AEEF" }}>
+                            Référence parcours
+                          </span>
+                        </label>
+                        <input
+                          type="date"
+                          id="datePrisePoste"
+                          name="datePrisePoste"
+                          value={affectationDatePriseDePoste || professionalHireDate || ""}
+                          onChange={(e) => setAffectationDatePriseDePoste(e.target.value)}
+                          className="input-field"
+                        />
+                        <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                          {affectationDatePriseDePoste || professionalHireDate 
+                            ? `📅 Date de référence: ${new Date(affectationDatePriseDePoste || professionalHireDate).toLocaleDateString("fr-FR")}`
+                            : "Les échéances des tâches du parcours seront calculées depuis cette date."}
+                        </p>
+                      </div>
+
                       {/* Récapitulatif */}
                       {affectationPositionId && (user.role === "MANAGER" || affectationManagerId) && (
                         <div className="rounded-xl p-4 space-y-2"
@@ -649,9 +788,9 @@ const SalarieProfilePage = () => {
                             ...(user.role !== "MANAGER" && selectedManager
                               ? [{ label: "Manager", value: `${selectedManager.prenom} ${selectedManager.nom}` }]
                               : []),
-                            { label: "Date",    value: new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) },
+                            { label: "Date de prise de poste", value: affectationDatePriseDePoste || professionalHireDate || "Non définie" },
                           ].map((f) => (
-                            <div key={f.label} className="flex justify-between text-sm">f
+                            <div key={f.label} className="flex justify-between text-sm">
                               <span style={{ color: "var(--text-muted)" }}>{f.label}</span>
                               <span className="font-semibold" style={{ color: "#1A2B6B" }}>{f.value}</span>
                             </div>
@@ -730,20 +869,10 @@ const SalarieProfilePage = () => {
                   placeholder="Ex: Votre adresse est incomplète..."
                   rows={4} className="input-field" style={{ resize: "none" }} />
               </div>
-              <div>
-                <label className="block text-xs font-bold mb-2 uppercase tracking-wide"
-                  style={{ color: "var(--text-muted)" }}>
-                  Date limite de correction *
-                </label>
-                <input type="date" value={dateLimiteCorrection}
-                  onChange={(e) => setDateLimiteCorrection(e.target.value)}
-                  className="input-field"
-                  min={new Date().toISOString().split("T")[0]} />
-              </div>
               <div className="flex gap-3 pt-2">
                 <button type="button"
                   onClick={() => correctionMutation.mutate()}
-                  disabled={!commentaire.trim() || !dateLimiteCorrection || correctionMutation.isPending}
+                  disabled={!commentaire.trim() || correctionMutation.isPending}
                   className="btn-primary flex-1 py-3">
                   {correctionMutation.isPending ? (
                     <span className="flex items-center justify-center gap-2">
