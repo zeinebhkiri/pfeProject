@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type JSX } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getMyParcoursApi,
@@ -39,7 +39,12 @@ const ACTEUR_LABELS: Record<string, string> = {
   MANAGER: "👔 Manager",
   RH:      "🏢 RH",
 };
-
+const PHASES = [
+  { value: "PHASE_1", label: "Phase 1 — Pré-onboarding",      color: "#1A2B6B", bg: "rgba(26,43,107,0.08)"  },
+  { value: "PHASE_2", label: "Phase 2 — Intégration",          color: "#00AEEF", bg: "rgba(0,174,239,0.08)"  },
+  { value: "PHASE_3", label: "Phase 3 — Montée en compétence", color: "#8DC63F", bg: "rgba(141,198,63,0.08)" },
+  { value: "PHASE_4", label: "Phase 4 — Validation",           color: "#7c3aed", bg: "rgba(124,58,237,0.08)" },
+];
 // ── Helpers ────────────────────────────────────────────────────────────
 const detectMimeType = (base64: string): string => {
   if (base64.startsWith("/9j/")) return "image/jpeg";
@@ -97,7 +102,21 @@ const MonParcoursPage = () => {
     queryFn: getMyTasksApi,
     retry: false,
   });
+const getEcheanceConfig = (echeance?: string, statut?: string) => {
+  if (!echeance || statut === "TERMINE" || statut === "REJETE") return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(echeance);
+  due.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((due.getTime() - today.getTime()) / 86400000);
 
+  if (diff < 0)  return { label: `Retard J+${Math.abs(diff)}`, color: "#dc2626", bg: "#fef2f2", border: "#fecaca", pulse: false, blink: true  };
+  if (diff === 0) return { label: "Aujourd'hui",                color: "#dc2626", bg: "#fef2f2", border: "#fecaca", pulse: true,  blink: false };
+  if (diff === 1) return { label: "Demain J-1",                 color: "#ea580c", bg: "#fff7ed", border: "#fed7aa", pulse: true,  blink: false };
+  if (diff <= 2)  return { label: `J-${diff}`,                  color: "#d97706", bg: "#fffbeb", border: "#fde68a", pulse: false, blink: false };
+  if (diff <= 6)  return { label: `J-${diff}`,                  color: "#ca8a04", bg: "#fefce8", border: "#fef08a", pulse: false, blink: false };
+  return           { label: `J-${diff}`,                        color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", pulse: false, blink: false };
+};
   // ── Mutations ─────────────────────────────────────────────────────
   const startMutation = useMutation({
     mutationFn: startTaskApi,
@@ -152,6 +171,7 @@ const MonParcoursPage = () => {
       setCommentText("");
     },
   });
+
 
   // ── Helpers ───────────────────────────────────────────────────────
 
@@ -343,135 +363,254 @@ const canCompleteTask = (task: Task): boolean => {
 
         <div className="flex h-[calc(100vh-73px)]">
 
-          {/* ── Colonne gauche — Liste tâches ── */}
-          <div className="w-96 flex-shrink-0 border-r overflow-y-auto"
-            style={{ borderColor: "var(--border)" }}>
-            <div className="p-4 space-y-2">
-              {tasksList.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-3">
-                  <span className="text-4xl">📋</span>
-                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>Aucune tâche</p>
+          {/* ── Bandeau récapitulatif échéances ── */}
+{(() => {
+  const retard   = tasksList.filter(t => {
+    const c = getEcheanceConfig(t.echeance, t.statut);
+    return c && c.blink;
+  });
+  const urgent   = tasksList.filter(t => {
+    const c = getEcheanceConfig(t.echeance, t.statut);
+    return c && c.pulse && !c.blink;
+  });
+  const warning  = tasksList.filter(t => {
+    if (!t.echeance || t.statut === "TERMINE") return false;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const due   = new Date(t.echeance); due.setHours(0,0,0,0);
+    const diff  = Math.ceil((due.getTime() - today.getTime()) / 86400000);
+    return diff >= 3 && diff <= 6;
+  });
+
+  if (retard.length === 0 && urgent.length === 0 && warning.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl p-4 mb-4 space-y-2"
+      style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+      <p className="text-xs font-bold uppercase tracking-widest mb-2"
+        style={{ color: "var(--text-muted)" }}>
+        ⏰ Récapitulatif des échéances
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {retard.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl badge-blink"
+            style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+            <div className="w-2 h-2 rounded-full" style={{ background: "#dc2626" }} />
+            <span className="text-xs font-semibold" style={{ color: "#dc2626" }}>
+              {retard.length} tâche{retard.length > 1 ? "s" : ""} en retard
+            </span>
+          </div>
+        )}
+        {urgent.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl badge-pulse"
+            style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>
+            <div className="w-2 h-2 rounded-full" style={{ background: "#ea580c" }} />
+            <span className="text-xs font-semibold" style={{ color: "#ea580c" }}>
+              {urgent.length} tâche{urgent.length > 1 ? "s" : ""} urgente{urgent.length > 1 ? "s" : ""}
+            </span>
+          </div>
+        )}
+        {warning.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+            style={{ background: "#fefce8", border: "1px solid #fef08a" }}>
+            <div className="w-2 h-2 rounded-full" style={{ background: "#ca8a04" }} />
+            <span className="text-xs font-semibold" style={{ color: "#ca8a04" }}>
+              {warning.length} tâche{warning.length > 1 ? "s" : ""} à surveiller
+            </span>
+          </div>
+        )}
+      </div>
+      {/* Liste des tâches en retard */}
+      {retard.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {retard.map(t => (
+            <div key={t.id} className="flex items-center gap-2 text-xs"
+              style={{ color: "#dc2626" }}>
+              <span>→</span>
+              <span className="font-medium">{t.titre}</span>
+              <span className="opacity-60">
+                {new Date(t.echeance!).toLocaleDateString("fr-FR")}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+})()}
+
+         {/* ── Colonne gauche — Liste tâches groupées par phase ── */}
+<div className="w-96 flex-shrink-0 border-r overflow-y-auto"
+  style={{ borderColor: "var(--border)" }}>
+  <div className="p-4 space-y-6">
+    {(() => {
+      // Définition des phases
+      const PHASES_CONFIG = [
+        { value: "PHASE_1", label: "Phase 1 — Découverte", color: "#00AEEF", bg: "rgba(0,174,239,0.08)" },
+        { value: "PHASE_2", label: "Phase 2 — Intégration", color: "#8DC63F", bg: "rgba(141,198,63,0.08)" },
+        { value: "PHASE_3", label: "Phase 3 — Formation", color: "#7c3aed", bg: "rgba(124,58,237,0.08)" },
+        { value: "PHASE_4", label: "Phase 4 — Évaluation", color: "#d97706", bg: "rgba(217,119,6,0.08)" },
+      ];
+
+      // Grouper les tâches par phase
+      const groupedTasks = new Map<string, Task[]>();
+      
+      tasksList.forEach((task: Task) => {
+        const phase = task.phase || "AUTRE";
+        if (!groupedTasks.has(phase)) {
+          groupedTasks.set(phase, []);
+        }
+        groupedTasks.get(phase)!.push(task);
+      });
+
+      // Si pas de tâches
+      if (tasksList.length === 0) {
+        return (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <span className="text-4xl">📋</span>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>Aucune tâche</p>
+          </div>
+        );
+      }
+
+      // Afficher les phases dans l'ordre
+      const phaseOrder = ["PHASE_1", "PHASE_2", "PHASE_3", "PHASE_4", "AUTRE"];
+      const result: JSX.Element[] = [];
+
+      for (const phaseValue of phaseOrder) {
+        const phaseTasks = groupedTasks.get(phaseValue);
+        if (!phaseTasks || phaseTasks.length === 0) continue;
+
+        const phaseConfig = PHASES_CONFIG.find(p => p.value === phaseValue) || {
+          value: "AUTRE", label: "Autres tâches", color: "#94a3b8", bg: "rgba(148,163,184,0.08)"
+        };
+        
+        const phaseCompleted = phaseTasks.filter(t => t.statut === "TERMINE").length;
+        const phaseProgress = Math.round((phaseCompleted / phaseTasks.length) * 100);
+
+        result.push(
+          <div key={phaseValue} className="mb-6 last:mb-0">
+            {/* Header phase */}
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold"
+                style={{ background: phaseConfig.bg, color: phaseConfig.color }}>
+                {phaseValue === "PHASE_1" ? "1" :
+                 phaseValue === "PHASE_2" ? "2" :
+                 phaseValue === "PHASE_3" ? "3" :
+                 phaseValue === "PHASE_4" ? "4" : "•"}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold" style={{ color: phaseConfig.color, fontFamily: "Sora" }}>
+                    {phaseConfig.label}
+                  </p>
+                  <span className="text-xs font-semibold" style={{ color: phaseProgress === 100 ? "#8DC63F" : phaseConfig.color }}>
+                    {phaseCompleted}/{phaseTasks.length}
+                  </span>
                 </div>
-              ) : (
-                tasksList.map((task, index) => {
-                  const typeConf   = TASK_TYPE_CONFIG[task.taskType];
-                  const statutConf = STATUT_CONFIG[task.statut];
-                  const isSelected = selectedTask?.id === task.id;
-                  //const isLocked   = task.verrouille;
-                  const iAmActeur  = canActOnTask(task);
-                  const isLockedQuiz = isQuizLocked(task);
-                  const isLocked = task.verrouille || isLockedQuiz;
+                {/* Barre progression phase */}
+                <div className="w-full h-1 rounded-full mt-1" style={{ background: "var(--border)" }}>
+                  <div className="h-1 rounded-full transition-all duration-500"
+                    style={{
+                      width: `${phaseProgress}%`,
+                      background: phaseProgress === 100 ? "#8DC63F" : phaseConfig.color,
+                    }} />
+                </div>
+              </div>
+            </div>
 
-                  return (
-                    <div key={task.id}
-                      onClick={() => !isLocked && handleOpenTask(task)}
-                      className="rounded-2xl p-4 transition-all duration-200"
-                      style={{
-                        cursor: isLocked ? "not-allowed" : "pointer",
-                        opacity: isLocked ? 0.5 : 1,
-                        border: isSelected
-                          ? "2px solid #00AEEF"
-                          : task.statut === "TERMINE"
-                          ? "1px solid rgba(141,198,63,0.3)"
-                          : "1px solid var(--border)",
-                        background: isSelected
-                          ? "rgba(0,174,239,0.04)"
-                          : task.statut === "TERMINE"
-                          ? "rgba(141,198,63,0.03)"
-                          : "var(--surface)",
-                      }}>
-                      <div className="flex items-start gap-3">
-                        <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
-                            style={{ background: typeConf.bg }}>
-                            {isLocked ? "🔒" : typeConf.icon}
-                          </div>
-                          {isLockedQuiz && (
-  <div className="mt-1">
-    <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600">
-      🔒 Disponible {getDaysUntilOuverture(task)} jour(s)
-    </span>
-  </div>
-)}
-                          {index < tasksList.length - 1 && (
-                            <div className="w-0.5 h-4 rounded-full"
-                              style={{ background: task.statut === "TERMINE" ? "#8DC63F" : "var(--border)" }} />
-                          )}
-                        </div>
+            {/* Tâches de cette phase */}
+            <div className="pl-2 space-y-2">
+              {phaseTasks.map((task) => {
+                const typeConf = TASK_TYPE_CONFIG[task.taskType];
+                const statutConf = STATUT_CONFIG[task.statut];
+                const isSelected = selectedTask?.id === task.id;
+                const iAmActeur = canActOnTask(task);
+                const isLockedQuiz = isQuizLocked(task);
+                const isLocked = task.verrouille || isLockedQuiz;
 
+                return (
+                  <div key={task.id}
+                    onClick={() => !isLocked && handleOpenTask(task)}
+                    className="rounded-xl p-3 transition-all duration-200 cursor-pointer"
+                    style={{
+                      opacity: isLocked ? 0.5 : 1,
+                      border: isSelected
+                        ? `2px solid ${typeConf.color}`
+                        : task.statut === "TERMINE"
+                        ? "1px solid rgba(141,198,63,0.3)"
+                        : "1px solid var(--border)",
+                      background: isSelected
+                        ? `${typeConf.bg}`
+                        : task.statut === "TERMINE"
+                        ? "rgba(141,198,63,0.03)"
+                        : "var(--surface)",
+                         borderLeft: (() => {
+    const ec = getEcheanceConfig(task.echeance, task.statut);
+    if (!ec || isSelected) return undefined;
+    if (ec.blink || ec.pulse) return `3px solid ${ec.color}`;
+    return undefined;
+  })(),
+                    }}>
+                    <div className="flex items-start gap-2">
+                      {/* Icône */}
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
+                        style={{ background: typeConf.bg }}>
+                        {isLocked ? "🔒" : typeConf.icon}
+                      </div>
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-semibold leading-tight"
-                              style={{ color: "var(--text)", fontFamily: "Sora" }}>
-                              {task.titre}
-                            </p>
-                            {task.statut === "TERMINE" && (
-                              <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                                style={{ background: "#8DC63F" }}>
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                                  <polyline points="20 6 9 17 4 12"/>
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            <span className="text-xs px-1.5 py-0.5 rounded-full"
-                              style={{ background: typeConf.bg, color: typeConf.color }}>
-                              {typeConf.label}
-                            </span>
-                            <span className="text-xs px-1.5 py-0.5 rounded-full"
-                              style={{ background: statutConf.bg, color: statutConf.color }}>
-                              {statutConf.label}
-                            </span>
-                            {/* Acteurs de la tâche */}
-                            {task.typeActeurs?.map(a => (
-                              <span key={a} className="text-xs px-1.5 py-0.5 rounded-full"
-                                style={{ background: "var(--bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
-                                {ACTEUR_LABELS[a]}
-                              </span>
-                            ))}
-                            {/* Tâche informative seulement */}
-                            {!iAmActeur && (
-                              <span className="text-xs px-1.5 py-0.5 rounded-full"
-                                style={{ background: "rgba(148,163,184,0.1)", color: "#94a3b8" }}>
-                                👁 Info
-                              </span>
-                            )}
-                            {task.obligatoire && (
-                              <span className="text-xs" style={{ color: "#dc2626" }}>*</span>
-                            )}
-                          </div>
-
-                          {task.statut === "EN_COURS" && task.progression > 0 && (
-                            <div className="mt-2 w-full h-1 rounded-full" style={{ background: "var(--border)" }}>
-                              <div className="h-1 rounded-full transition-all"
-                                style={{ width: `${task.progression}%`, background: "#00AEEF" }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-1">
+                          <p className="text-sm font-semibold leading-tight truncate"
+                            style={{ color: "var(--text)", fontFamily: "Sora" }}>
+                            {task.titre}
+                          </p>
+                          {task.statut === "TERMINE" && (
+                            <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
+                              style={{ background: "#8DC63F" }}>
+                              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
                             </div>
                           )}
-
-                          {task.taskType === "QUIZ" && task.scoreObtenu !== undefined && task.scoreObtenu > 0 && (
-                            <p className="text-xs mt-1" style={{
-                              color: task.scoreObtenu >= (task.config?.scoreMinimum ?? 70) ? "#8DC63F" : "#dc2626"
-                            }}>
-                              Score: {task.scoreObtenu}% (min: {task.config?.scoreMinimum ?? 70}%)
-                            </p>
-                          )}
-
-                          {task.echeance && task.statut !== "TERMINE" && (
-                            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                              ⏱ {new Date(task.echeance).toLocaleDateString("fr-FR")}
-                            </p>
-                          )}
                         </div>
+
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">
+                            {(() => {
+    const ec = getEcheanceConfig(task.echeance, task.statut);
+    if (!ec) return null;
+    return (
+      <span
+        className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+          ec.pulse ? "badge-pulse" : ec.blink ? "badge-blink" : ""
+        }`}
+        style={{ background: ec.bg, color: ec.color, border: `1px solid ${ec.border}` }}>
+        {ec.pulse || ec.blink ? "⚠ " : "⏱ "}{ec.label}
+      </span>
+    );
+  })()}
+</div>
+
+                        {task.taskType === "QUIZ" && task.scoreObtenu !== undefined && task.scoreObtenu > 0 && (
+                          <p className="text-[10px] mt-1" style={{
+                            color: task.scoreObtenu >= (task.config?.scoreMinimum ?? 70) ? "#8DC63F" : "#dc2626"
+                          }}>
+                            Score: {task.scoreObtenu}%
+                          </p>
+                        )}
                       </div>
                     </div>
-                  );
-                })
-              )}
+                  </div>
+                );
+              })}
             </div>
           </div>
+        );
+      }
+
+      return result;
+    })()}
+  </div>
+</div>
 
           {/* ── Colonne droite — Détail tâche ── */}
           <div className="flex-1 overflow-y-auto">
@@ -1125,7 +1264,20 @@ const canCompleteTask = (task: Task): boolean => {
           </div>
         </div>
       </main>
+      <style>{`
+  @keyframes pulse-badge {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.7; transform: scale(1.08); }
+  }
+  @keyframes blink-badge {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.35; }
+  }
+  .badge-pulse { animation: pulse-badge 1.4s ease-in-out infinite; }
+  .badge-blink { animation: blink-badge 1s ease-in-out infinite; }
+`}</style>
     </div>
+    
   );
 };
 

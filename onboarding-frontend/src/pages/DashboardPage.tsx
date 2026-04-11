@@ -156,13 +156,56 @@ const DashboardPage = () => {
     },
   });
 
+  // ── Helpers rôle / acteur ─────────────────────────────────────────
+  const myTypeActeur = role === "MANAGER" ? "MANAGER" : role === "ADMIN" ? "RH" : "SALARIE";
+
+  const canActOnTask = (task: Task): boolean =>
+    task.typeActeurs?.includes(myTypeActeur as any) ?? false;
+
+  const myProgressionDone = (task: Task): boolean => {
+    if (!task.acteurProgressions) return false;
+    return task.acteurProgressions
+      .filter(ap => ap.typeActeur === myTypeActeur)
+      .some(ap => ap.complete);
+  };
+
+  const canCompleteTask = (task: Task): boolean => {
+    const acteurs = task.typeActeurs;
+    if (acteurs.includes("SALARIE") && role !== "SALARIE") return false;
+    if (acteurs.includes("MANAGER") && role !== "MANAGER") return false;
+    if (acteurs.includes("RH") && role !== "ADMIN") return false;
+    return true;
+  };
+
+  const isQuizLocked = (task: Task): boolean => {
+    if (task.taskType !== "QUIZ") return false;
+    if (!task.dateOuverture) return false;
+    return new Date() < new Date(task.dateOuverture);
+  };
+
+  const getDaysUntilOuverture = (task: Task): number | null => {
+    if (!task.dateOuverture) return null;
+    const diffTime = new Date(task.dateOuverture).getTime() - Date.now();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const ACTEUR_LABELS: Record<string, string> = {
+    SALARIE: "👤 Salarié",
+    MANAGER: "👔 Manager",
+    RH:      "🏢 RH",
+  };
+
   // ── Handlers ──────────────────────────────────────────────────────
   const handleOpenTask = (task: Task) => {
+    if (isQuizLocked(task)) {
+      setErrorMsg(`Ce quiz sera disponible le ${new Date(task.dateOuverture!).toLocaleDateString('fr-FR')}`);
+      return;
+    }
     setSelectedTask(task);
     setShowTaskPanel(true);
     setQuizReponses([]); setQuizSubmitted(false); setQuizResult(null);
     setDocFile(null); setSuccessMsg(""); setErrorMsg("");
-    if (task.statut === "NON_COMMENCE" && !task.verrouille) startMutation.mutate(task.id);
+    if (task.statut === "NON_COMMENCE" && !task.verrouille && canActOnTask(task)) startMutation.mutate(task.id);
   };
 
   const handleQuizSubmit = () => {
@@ -424,8 +467,10 @@ const DashboardPage = () => {
                         const typeConf   = TASK_TYPE_CONFIG[task.taskType];
                         const statutConf = STATUT_TASK[task.statut];
                         const isLast     = index === tasksList.length - 1;
-                        const isLocked   = task.verrouille;
+                        const isLockedQuiz = isQuizLocked(task);
+                        const isLocked   = task.verrouille || isLockedQuiz;
                         const isSelected = selectedTask?.id === task.id && showTaskPanel;
+                        const iAmActeur  = canActOnTask(task);
 
                         return (
                           <div key={task.id} className="flex gap-4">
@@ -497,6 +542,24 @@ const DashboardPage = () => {
                                         <span className="text-xs font-semibold"
                                           style={{ color: task.scoreObtenu >= (task.config?.scoreMinimum ?? 70) ? "#8DC63F" : "#dc2626" }}>
                                           {task.scoreObtenu}%
+                                        </span>
+                                      )}
+                                      {/* Acteurs de la tâche */}
+                                      {task.typeActeurs?.map(a => (
+                                        <span key={a} className="text-xs px-1.5 py-0.5 rounded-full"
+                                          style={{ background: "var(--bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
+                                          {ACTEUR_LABELS[a]}
+                                        </span>
+                                      ))}
+                                      {!iAmActeur && (
+                                        <span className="text-xs px-1.5 py-0.5 rounded-full"
+                                          style={{ background: "rgba(148,163,184,0.1)", color: "#94a3b8" }}>
+                                          👁 Info
+                                        </span>
+                                      )}
+                                      {isLockedQuiz && (
+                                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600">
+                                          🔒 Disponible dans {getDaysUntilOuverture(task)} jour(s)
                                         </span>
                                       )}
                                     </div>
@@ -606,6 +669,7 @@ const DashboardPage = () => {
             {(() => {
               const typeConf   = TASK_TYPE_CONFIG[selectedTask.taskType];
               const statutConf = STATUT_TASK[selectedTask.statut];
+              const iAmActeur  = canActOnTask(selectedTask);
               return (
                 <div className="px-6 py-5 border-b flex items-start gap-4 sticky top-0 z-10"
                   style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
@@ -617,7 +681,7 @@ const DashboardPage = () => {
                     <h3 className="font-bold text-base" style={{ color: "var(--text)", fontFamily: "Sora" }}>
                       {selectedTask.titre}
                     </h3>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-xs px-2 py-0.5 rounded-full"
                         style={{ background: statutConf.bg, color: statutConf.color }}>
                         {statutConf.label}
@@ -627,7 +691,36 @@ const DashboardPage = () => {
                           ⏱ {new Date(selectedTask.echeance).toLocaleDateString("fr-FR")}
                         </span>
                       )}
+                      {selectedTask.typeActeurs?.map(a => (
+                        <span key={a} className="text-xs px-1.5 py-0.5 rounded-full"
+                          style={{ background: "var(--bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
+                          {ACTEUR_LABELS[a]}
+                        </span>
+                      ))}
+                      {!iAmActeur && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-full"
+                          style={{ background: "rgba(148,163,184,0.1)", color: "#94a3b8" }}>
+                          👁 Info
+                        </span>
+                      )}
                     </div>
+                    {/* Progression multi-acteur */}
+                    {selectedTask.acteurProgressions && selectedTask.acteurProgressions.length > 1 && (
+                      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                        {selectedTask.acteurProgressions.map((ap, i) => (
+                          <div key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-lg"
+                            style={{
+                              background: ap.complete ? "rgba(141,198,63,0.1)" : "var(--bg)",
+                              border: `1px solid ${ap.complete ? "rgba(141,198,63,0.3)" : "var(--border)"}`,
+                            }}>
+                            <span className="text-xs">{ap.complete ? "✅" : "⏳"}</span>
+                            <span className="text-xs" style={{ color: ap.complete ? "#8DC63F" : "var(--text-muted)" }}>
+                              {ACTEUR_LABELS[ap.typeActeur]}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <button type="button" onClick={() => setShowTaskPanel(false)}
                     className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
@@ -662,8 +755,22 @@ const DashboardPage = () => {
                 <p className="text-sm" style={{ color: "var(--text-muted)" }}>{selectedTask.description}</p>
               )}
 
+              {/* ── Tâche informative (je ne suis pas acteur) ── */}
+              {!canActOnTask(selectedTask) && selectedTask.statut !== "TERMINE" && (
+                <div className="p-5 rounded-2xl text-center space-y-2"
+                  style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                  <span className="text-3xl">👁</span>
+                  <p className="font-semibold text-sm" style={{ color: "var(--text)", fontFamily: "Sora" }}>
+                    Cette tâche est gérée par {selectedTask.typeActeurs?.map(a => ACTEUR_LABELS[a]).join(" et ")}
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    Elle contribuera automatiquement à votre progression une fois complétée.
+                  </p>
+                </div>
+              )}
+
               {/* ── FORMATION ── */}
-              {selectedTask.taskType === "FORMATION" && (
+              {selectedTask.taskType === "FORMATION" && canActOnTask(selectedTask) && (
                 <div className="space-y-4">
                   {selectedTask.config?.videoUrl && (
                     selectedTask.config.videoUrl.includes("youtube") || selectedTask.config.videoUrl.includes("youtu.be") ? (
@@ -691,114 +798,171 @@ const DashboardPage = () => {
                       <span className="text-xs opacity-60">Ouvrir</span>
                     </button>
                   )}
-                  {selectedTask.statut !== "TERMINE" && (
+                  {selectedTask.statut !== "TERMINE" && !myProgressionDone(selectedTask) && canCompleteTask(selectedTask) && (
                     <button type="button" onClick={() => completeMutation.mutate(selectedTask.id)}
                       disabled={completeMutation.isPending} className="btn-primary w-full py-3">
-                      {completeMutation.isPending ? "..." : "✅ Marquer comme vue"}
+                      {completeMutation.isPending ? "..." : "✅ Marquer la formation comme vue"}
                     </button>
+                  )}
+                  {myProgressionDone(selectedTask) && selectedTask.statut !== "TERMINE" && (
+                    <div className="p-3 rounded-xl text-sm text-center"
+                      style={{ background: "rgba(141,198,63,0.06)", border: "1px solid rgba(141,198,63,0.2)", color: "#059669" }}>
+                      ✅ Votre part est complète — en attente des autres acteurs
+                    </div>
                   )}
                 </div>
               )}
 
               {/* ── QUIZ ── */}
-              {selectedTask.taskType === "QUIZ" && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-                      Score minimum : <span style={{ color: "#8DC63F" }}>{selectedTask.config?.scoreMinimum ?? 70}%</span>
-                    </p>
-                    {selectedTask.nbTentatives > 0 && (
-                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                        Tentatives : {selectedTask.nbTentatives}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Résultat précédent */}
-                  {selectedTask.scoreObtenu !== undefined && selectedTask.scoreObtenu > 0 && !quizSubmitted && (
-                    <div className="rounded-xl p-3"
-                      style={{
-                        background: selectedTask.scoreObtenu >= (selectedTask.config?.scoreMinimum ?? 70) ? "#ecfdf5" : "#fef2f2",
-                        border: `1px solid ${selectedTask.scoreObtenu >= (selectedTask.config?.scoreMinimum ?? 70) ? "#a7f3d0" : "#fecaca"}`,
-                      }}>
-                      <p className="text-sm font-semibold"
-                        style={{ color: selectedTask.scoreObtenu >= (selectedTask.config?.scoreMinimum ?? 70) ? "#059669" : "#dc2626" }}>
-                        {selectedTask.scoreObtenu >= (selectedTask.config?.scoreMinimum ?? 70)
-                          ? `✅ Réussi — ${selectedTask.scoreObtenu}%`
-                          : `❌ ${selectedTask.scoreObtenu}% — Score insuffisant`}
+              {selectedTask.taskType === "QUIZ" && canActOnTask(selectedTask) && (() => {
+                if (isQuizLocked(selectedTask)) {
+                  const daysLeft = getDaysUntilOuverture(selectedTask);
+                  const ouvertureDate = new Date(selectedTask.dateOuverture!);
+                  return (
+                    <div className="p-6 rounded-2xl text-center space-y-4"
+                      style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                      <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto"
+                        style={{ background: "rgba(245,158,11,0.1)" }}>🔒</div>
+                      <h3 className="font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>Quiz non disponible</h3>
+                      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                        Disponible dans <strong className="text-orange-500">{daysLeft} jour{daysLeft && daysLeft > 1 ? "s" : ""}</strong>
+                      </p>
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                        Ouverture : {ouvertureDate.toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
                       </p>
                     </div>
-                  )}
-
-                  {/* Questions */}
-                  {selectedTask.statut !== "TERMINE" && !quizSubmitted && (
-                    <>
-                      {(selectedTask.config?.questions ?? []).map((q: Question, qIndex: number) => (
-                        <div key={q.id} className="p-4 rounded-2xl space-y-3"
-                          style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
-                          <p className="font-semibold text-sm" style={{ color: "var(--text)" }}>
-                            {qIndex + 1}. {q.texte}
-                          </p>
-                          <div className="space-y-2">
-                            {q.options.map((opt: string, oIndex: number) => (
-                              <label key={oIndex}
-                                className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition"
-                                style={{
-                                  background: quizReponses[qIndex] === oIndex ? "rgba(0,174,239,0.08)" : "var(--surface)",
-                                  border: `1px solid ${quizReponses[qIndex] === oIndex ? "rgba(0,174,239,0.3)" : "var(--border)"}`,
-                                }}>
-                                <input type="radio" name={`q${qIndex}`}
-                                  checked={quizReponses[qIndex] === oIndex}
-                                  onChange={() => {
-                                    const rep = [...quizReponses]; rep[qIndex] = oIndex; setQuizReponses(rep);
-                                  }}
-                                  style={{ accentColor: "#00AEEF" }} />
-                                <span className="text-sm" style={{ color: "var(--text)" }}>
-                                  <strong style={{ color: "var(--text-muted)" }}>{String.fromCharCode(65 + oIndex)}.</strong> {opt}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                      <button type="button" onClick={handleQuizSubmit}
-                        disabled={quizMutation.isPending}
-                        className="btn-primary w-full py-3">
-                        {quizMutation.isPending ? "Correction..." : "🚀 Soumettre"}
-                      </button>
-                    </>
-                  )}
-
-                  {/* Résultat soumission */}
-                  {quizSubmitted && quizResult && (
-                    <div className="rounded-2xl p-5 text-center"
-                      style={{
-                        background: quizResult.scoreObtenu! >= (quizResult.config?.scoreMinimum ?? 70) ? "#ecfdf5" : "#fef2f2",
-                        border: `1px solid ${quizResult.scoreObtenu! >= (quizResult.config?.scoreMinimum ?? 70) ? "#a7f3d0" : "#fecaca"}`,
-                      }}>
-                      <div className="text-4xl mb-2">
-                        {quizResult.scoreObtenu! >= (quizResult.config?.scoreMinimum ?? 70) ? "🎉" : "😕"}
-                      </div>
-                      <p className="text-2xl font-bold" style={{
-                        color: quizResult.scoreObtenu! >= (quizResult.config?.scoreMinimum ?? 70) ? "#059669" : "#dc2626",
-                        fontFamily: "Sora"
-                      }}>
-                        {quizResult.scoreObtenu}%
+                  );
+                }
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+                        Score minimum : <span style={{ color: "#8DC63F" }}>{selectedTask.config?.scoreMinimum ?? 70}%</span>
                       </p>
-                      <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                        Minimum requis : {quizResult.config?.scoreMinimum ?? 70}%
-                      </p>
-                      {quizResult.statut !== "TERMINE" && (
-                        <button type="button" onClick={() => { setQuizReponses([]); setQuizSubmitted(false); setQuizResult(null); }}
-                          className="btn-primary px-5 py-2 mt-3">Réessayer</button>
+                      {selectedTask.nbTentatives > 0 && (
+                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                          Tentative {selectedTask.nbTentatives} / 3
+                        </span>
                       )}
                     </div>
-                  )}
-                </div>
-              )}
+
+                    {/* Bloqué après 3 tentatives */}
+                    {selectedTask.nbTentatives >= 3 && selectedTask.statut !== "TERMINE" && (
+                      <div className="p-3 rounded-xl text-sm text-center"
+                        style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
+                        ⚠️ Nombre maximum de tentatives atteint (3/3). Quiz bloqué.
+                      </div>
+                    )}
+
+                    {/* Résultat précédent */}
+                    {selectedTask.scoreObtenu !== undefined && selectedTask.scoreObtenu > 0 && !quizSubmitted && (
+                      <div className="rounded-xl p-3"
+                        style={{
+                          background: selectedTask.scoreObtenu >= (selectedTask.config?.scoreMinimum ?? 70) ? "#ecfdf5" : "#fef2f2",
+                          border: `1px solid ${selectedTask.scoreObtenu >= (selectedTask.config?.scoreMinimum ?? 70) ? "#a7f3d0" : "#fecaca"}`,
+                        }}>
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <p className="text-sm font-semibold"
+                            style={{ color: selectedTask.scoreObtenu >= (selectedTask.config?.scoreMinimum ?? 70) ? "#059669" : "#dc2626" }}>
+                            {selectedTask.scoreObtenu >= (selectedTask.config?.scoreMinimum ?? 70)
+                              ? `✅ Réussi — ${selectedTask.scoreObtenu}%`
+                              : `❌ ${selectedTask.scoreObtenu}% — Score insuffisant`}
+                          </p>
+                          {selectedTask.scoreObtenu < (selectedTask.config?.scoreMinimum ?? 70) &&
+                           selectedTask.statut !== "TERMINE" &&
+                           !myProgressionDone(selectedTask) &&
+                           selectedTask.nbTentatives < 3 && (
+                            <button type="button"
+                              onClick={() => { setQuizReponses([]); setQuizSubmitted(false); setQuizResult(null); setErrorMsg(""); }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                              style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
+                              🔄 Réessayer ({selectedTask.nbTentatives + 1}/3)
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Questions */}
+                    {selectedTask.statut !== "TERMINE" &&
+                     !myProgressionDone(selectedTask) &&
+                     !quizSubmitted &&
+                     (selectedTask.scoreObtenu === undefined || selectedTask.scoreObtenu < (selectedTask.config?.scoreMinimum ?? 70)) &&
+                     selectedTask.nbTentatives < 3 && (
+                      <>
+                        {(selectedTask.config?.questions ?? []).map((q: Question, qIndex: number) => (
+                          <div key={q.id} className="p-4 rounded-2xl space-y-3"
+                            style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                            <p className="font-semibold text-sm" style={{ color: "var(--text)" }}>
+                              {qIndex + 1}. {q.texte}
+                            </p>
+                            <div className="space-y-2">
+                              {q.options.map((opt: string, oIndex: number) => (
+                                <label key={oIndex}
+                                  className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition"
+                                  style={{
+                                    background: quizReponses[qIndex] === oIndex ? "rgba(0,174,239,0.08)" : "var(--surface)",
+                                    border: `1px solid ${quizReponses[qIndex] === oIndex ? "rgba(0,174,239,0.3)" : "var(--border)"}`,
+                                  }}>
+                                  <input type="radio" name={`q${qIndex}`}
+                                    checked={quizReponses[qIndex] === oIndex}
+                                    onChange={() => {
+                                      const rep = [...quizReponses]; rep[qIndex] = oIndex; setQuizReponses(rep);
+                                    }}
+                                    style={{ accentColor: "#00AEEF" }} />
+                                  <span className="text-sm" style={{ color: "var(--text)" }}>
+                                    <strong style={{ color: "var(--text-muted)" }}>{String.fromCharCode(65 + oIndex)}.</strong> {opt}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        <button type="button" onClick={handleQuizSubmit}
+                          disabled={quizMutation.isPending || quizReponses.length < (selectedTask.config?.questions?.length ?? 0)}
+                          className="btn-primary w-full py-3">
+                          {quizMutation.isPending ? "Correction..." : "🚀 Soumettre"}
+                        </button>
+                      </>
+                    )}
+
+                    {/* Résultat soumission */}
+                    {quizSubmitted && quizResult && (
+                      <div className="rounded-2xl p-5 text-center space-y-2"
+                        style={{
+                          background: quizResult.scoreObtenu! >= (quizResult.config?.scoreMinimum ?? 70) ? "#ecfdf5" : "#fef2f2",
+                          border: `1px solid ${quizResult.scoreObtenu! >= (quizResult.config?.scoreMinimum ?? 70) ? "#a7f3d0" : "#fecaca"}`,
+                        }}>
+                        <div className="text-4xl">{quizResult.scoreObtenu! >= (quizResult.config?.scoreMinimum ?? 70) ? "🎉" : "😕"}</div>
+                        <p className="text-2xl font-bold" style={{
+                          color: quizResult.scoreObtenu! >= (quizResult.config?.scoreMinimum ?? 70) ? "#059669" : "#dc2626",
+                          fontFamily: "Sora"
+                        }}>{quizResult.scoreObtenu}%</p>
+                        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                          Minimum : {quizResult.config?.scoreMinimum ?? 70}% · Tentative {quizResult.nbTentatives}/3
+                        </p>
+                        {quizResult.statut !== "TERMINE" && !myProgressionDone(quizResult) && quizResult.nbTentatives < 3 && (
+                          <button type="button" onClick={() => { setQuizReponses([]); setQuizSubmitted(false); setQuizResult(null); }}
+                            className="btn-primary px-5 py-2 mt-2">
+                            Réessayer (Tentative {quizResult.nbTentatives + 1}/3)
+                          </button>
+                        )}
+                        {quizResult.nbTentatives >= 3 && quizResult.statut !== "TERMINE" && (
+                          <p className="text-sm font-semibold" style={{ color: "#dc2626" }}>
+                            ⚠️ Nombre maximum de tentatives atteint.
+                          </p>
+                        )}
+                        {myProgressionDone(quizResult) && quizResult.statut !== "TERMINE" && (
+                          <p className="text-sm" style={{ color: "#059669" }}>✅ Votre part est complète — en attente des autres acteurs</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* ── DOCUMENT_RH ── */}
-              {selectedTask.taskType === "DOCUMENT_RH" && (
+              {selectedTask.taskType === "DOCUMENT_RH" && canActOnTask(selectedTask) && (
                 <div className="space-y-3">
                   <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                     Document mis à disposition par les RH.
@@ -817,17 +981,23 @@ const DashboardPage = () => {
                       Document en cours de mise à disposition...
                     </div>
                   )}
-                  {selectedTask.statut !== "TERMINE" && (
+                  {selectedTask.statut !== "TERMINE" && !myProgressionDone(selectedTask) && canCompleteTask(selectedTask) && (
                     <button type="button" onClick={() => completeMutation.mutate(selectedTask.id)}
                       disabled={completeMutation.isPending} className="btn-primary w-full py-3">
-                      ✅ Confirmer la lecture
+                      {completeMutation.isPending ? "..." : "✅ Confirmer la lecture"}
                     </button>
+                  )}
+                  {myProgressionDone(selectedTask) && selectedTask.statut !== "TERMINE" && (
+                    <div className="p-3 rounded-xl text-sm text-center"
+                      style={{ background: "rgba(141,198,63,0.06)", border: "1px solid rgba(141,198,63,0.2)", color: "#059669" }}>
+                      ✅ Lu — en attente des autres acteurs
+                    </div>
                   )}
                 </div>
               )}
 
               {/* ── DOCUMENT_SALARIE ── */}
-              {selectedTask.taskType === "DOCUMENT_SALARIE" && (
+              {selectedTask.taskType === "DOCUMENT_SALARIE" && canActOnTask(selectedTask) && (
                 <div className="space-y-3">
                   {selectedTask.config?.typeDocumentAttendu && (
                     <div className="p-3 rounded-xl text-sm"
@@ -843,7 +1013,7 @@ const DashboardPage = () => {
                       <span className="text-xs text-emerald-600">Déposé ✓</span>
                     </div>
                   )}
-                  {selectedTask.statut !== "TERMINE" && (
+                  {selectedTask.statut !== "TERMINE" && !myProgressionDone(selectedTask) && (
                     <>
                       <label className="flex items-center justify-center gap-3 w-full py-4 rounded-xl cursor-pointer"
                         style={{ background: "var(--bg)", border: "2px dashed var(--border)" }}>
@@ -861,7 +1031,16 @@ const DashboardPage = () => {
                         disabled={!docFile || docMutation.isPending} className="btn-primary w-full py-3">
                         {docMutation.isPending ? "Dépôt..." : "⬆ Déposer"}
                       </button>
+                      <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>
+                        Validé par {selectedTask.typeActeurs?.filter(a => a !== "SALARIE").map(a => ACTEUR_LABELS[a]).join(" / ") || "le responsable"}
+                      </p>
                     </>
+                  )}
+                  {myProgressionDone(selectedTask) && selectedTask.statut !== "TERMINE" && (
+                    <div className="p-3 rounded-xl text-sm text-center"
+                      style={{ background: "rgba(141,198,63,0.06)", border: "1px solid rgba(141,198,63,0.2)", color: "#059669" }}>
+                      ✅ Document déposé — en attente de validation
+                    </div>
                   )}
                 </div>
               )}
@@ -912,7 +1091,7 @@ const DashboardPage = () => {
               )}
 
               {/* ── SIMPLE ── */}
-              {selectedTask.taskType === "SIMPLE" && (
+              {selectedTask.taskType === "SIMPLE" && canActOnTask(selectedTask) && (
                 <div className="space-y-3">
                   {selectedTask.config?.datePlanifiee && (
                     <div className="p-3 rounded-xl text-sm"
@@ -920,15 +1099,24 @@ const DashboardPage = () => {
                       📅 {new Date(selectedTask.config.datePlanifiee).toLocaleDateString("fr-FR")}
                     </div>
                   )}
-                  {selectedTask.statut !== "TERMINE" ? (
+                  {selectedTask.statut !== "TERMINE" && !myProgressionDone(selectedTask) && canCompleteTask(selectedTask) && (
                     <button type="button" onClick={() => completeMutation.mutate(selectedTask.id)}
                       disabled={completeMutation.isPending} className="btn-primary w-full py-3">
                       {completeMutation.isPending ? "..." : "✅ Marquer comme effectué"}
                     </button>
-                  ) : (
+                  )}
+                  {myProgressionDone(selectedTask) && selectedTask.statut !== "TERMINE" && (
+                    <div className="p-3 rounded-xl text-sm text-center"
+                      style={{ background: "rgba(141,198,63,0.06)", border: "1px solid rgba(141,198,63,0.2)", color: "#059669" }}>
+                      ✅ Effectué — en attente des autres acteurs
+                    </div>
+                  )}
+                  {selectedTask.statut === "TERMINE" && (
                     <div className="p-3 rounded-xl text-sm text-center"
                       style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#059669" }}>
-                      ✓ Effectué
+                      ✓ Effectué{selectedTask.dateCompletion
+                        ? ` le ${new Date(selectedTask.dateCompletion).toLocaleDateString("fr-FR")}`
+                        : ""}
                     </div>
                   )}
                 </div>

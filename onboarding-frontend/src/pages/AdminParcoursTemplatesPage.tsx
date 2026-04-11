@@ -40,6 +40,13 @@ const ACTEUR_CONFIG: Record<TypeActeur, { label: string; icon: string }> = {
   RH:      { label: "RH / Admin", icon: "🏢" },
 };
 
+const PHASES = [
+  { value: "PHASE_1", label: "Phase 1 — Pré-onboarding",       color: "#1A2B6B", bg: "rgba(26,43,107,0.08)"  },
+  { value: "PHASE_2", label: "Phase 2 — Intégration",           color: "#00AEEF", bg: "rgba(0,174,239,0.08)"  },
+  { value: "PHASE_3", label: "Phase 3 — Montée en compétence",  color: "#8DC63F", bg: "rgba(141,198,63,0.08)" },
+  { value: "PHASE_4", label: "Phase 4 — Validation",            color: "#7c3aed", bg: "rgba(124,58,237,0.08)" },
+];
+
 // ── Formulaire tâche vide ──────────────────────────────────────────────
 const emptyTask = (): Partial<TaskTemplate> => ({
   titre: "",
@@ -584,6 +591,16 @@ const AdminParcoursTemplatesPage = () => {
                                   🔒 Déverrouillage auto
                                 </span>
                               )}
+                              {/* Ajouter dans le badge row de chaque tâche */}
+{task.phase && (() => {
+  const phaseConf = PHASES.find(p => p.value === task.phase);
+  return phaseConf ? (
+    <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+      style={{ background: phaseConf.bg, color: phaseConf.color }}>
+      {phaseConf.label.split("—")[0].trim()}
+    </span>
+  ) : null;
+})()}
                             </div>
                             <div className="flex items-center gap-3 mt-1 flex-wrap">
                               <span className="text-xs font-medium px-2 py-0.5 rounded-full"
@@ -766,6 +783,35 @@ const AdminParcoursTemplatesPage = () => {
                   placeholder="Décrivez cette tâche..."
                   rows={2} className="input-field" style={{ resize: "none" }} />
               </div>
+              {/* Phase */}
+<div>
+  <label className="block text-xs font-bold mb-2 uppercase tracking-wide"
+    style={{ color: "var(--text-muted)" }}>
+    Phase du parcours
+  </label>
+  <div className="grid grid-cols-2 gap-2">
+    {PHASES.map(p => (
+      <label key={p.value}
+        className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition"
+        style={{
+          background: taskForm.phase === p.value ? p.bg : "var(--bg)",
+          border: `1px solid ${taskForm.phase === p.value ? p.color : "var(--border)"}`,
+        }}>
+        <input
+          type="radio"
+          name="phase"
+          value={p.value}
+          checked={taskForm.phase === p.value}
+          onChange={() => setTaskForm(prev => ({ ...prev, phase: p.value }))}
+          style={{ accentColor: p.color }}
+        />
+        <span className="text-xs font-semibold" style={{ color: taskForm.phase === p.value ? p.color : "var(--text-muted)" }}>
+          {p.label}
+        </span>
+      </label>
+    ))}
+  </div>
+</div>
 
               {/* Type + Acteur */}
               <div className="grid grid-cols-2 gap-4">

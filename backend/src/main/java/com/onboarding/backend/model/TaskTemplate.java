@@ -24,6 +24,7 @@ public class TaskTemplate {
     private int ordre;
     private boolean obligatoire = true;
     private int delaiJours; // délai en jours depuis le début du parcours
+    private String phase;
     private TaskConfig config;
 
     @Data

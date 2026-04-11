@@ -183,6 +183,7 @@ export interface TaskTemplate {
   obligatoire: boolean;
   delaiJours: number;
   config?: TaskConfig;
+  phase?: string;
 }
 
 export interface ParcoursTemplate {
@@ -222,6 +223,7 @@ export interface Task {
   obligatoire: boolean;
   verrouille: boolean;
   statut: StatutTask;
+  phase?: string;
   echeance?: string;
   dateCompletion?: string;
   scoreObtenu?: number;

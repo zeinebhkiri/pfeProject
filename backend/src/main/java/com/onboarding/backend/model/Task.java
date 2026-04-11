@@ -30,7 +30,7 @@ public class Task {
     private int ordre;
     private boolean obligatoire;
     private boolean verrouille = false; // true pour ENTRETIEN jusqu'à unlock
-
+    private String phase;
     private StatutTask statut = StatutTask.NON_COMMENCE;
     private LocalDateTime echeance;
     private LocalDateTime dateCompletion;

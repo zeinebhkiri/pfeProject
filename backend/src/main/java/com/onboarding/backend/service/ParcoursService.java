@@ -65,11 +65,13 @@ public class ParcoursService {
             task.setTypeActeurs(tt.getTypeActeurs());
             task.setOrdre(tt.getOrdre());
             task.setObligatoire(tt.isObligatoire());
+            task.setPhase(tt.getPhase());
             task.setConfig(tt.getConfig());
             task.setStatut(Task.StatutTask.NON_COMMENCE);
             task.setNbTentatives(0);
             task.setProgression(0);
             task.setVerrouille(false); // Par défaut, non verrouillé
+
 
             // Assigner l'acteur
             List<String> acteurIds = new ArrayList<>();
