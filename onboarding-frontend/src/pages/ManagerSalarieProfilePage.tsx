@@ -139,9 +139,9 @@ const { data: affectation } = useQuery({
                     <span className="text-xs font-semibold" style={{ color: "var(--text)" }}>{user.role}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>Membre depuis</span>
+                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>Date d'embauche</span>
                     <span className="text-xs font-semibold" style={{ color: "var(--text)" }}>
-                      {new Date(user.dateCreation).toLocaleDateString("fr-FR")}
+                      {user.professionalInfo?.dateEmbauche ? new Date(user.professionalInfo.dateEmbauche).toLocaleDateString("fr-FR") : "Non renseigné"}
                     </span>
                   </div>
                   {user.dateValidation && (

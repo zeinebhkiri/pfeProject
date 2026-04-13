@@ -16,6 +16,7 @@ import Sidebar from "../components/Sidebar";
 import type { StatutCompte, UserProfile, UserRole, Task, TaskType, Parcours, Question } from "../types/auth";
 import TopNav from "../components/TopNav";
 import CompanyDocumentsWidget from "../components/CompanyDocumentsWidget";
+import ParcoursWidget from "../components/ParcoursWidget";
 
 // ── Configs visuelles ──────────────────────────────────────────────────
 const statutConfig: Record<string, { label: string; class: string; icon: string }> = {
@@ -181,6 +182,22 @@ const DashboardPage = () => {
     if (task.taskType !== "QUIZ") return false;
     if (!task.dateOuverture) return false;
     return new Date() < new Date(task.dateOuverture);
+  };
+
+  const getEcheanceConfig = (echeance?: string, statut?: string) => {
+    if (!echeance || statut === "TERMINE" || statut === "REJETE") return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(echeance);
+    due.setHours(0, 0, 0, 0);
+    const diff = Math.ceil((due.getTime() - today.getTime()) / 86400000);
+
+    if (diff < 0)  return { label: `Retard J+${Math.abs(diff)}`, color: "#dc2626", bg: "#fef2f2", border: "#fecaca", pulse: false, blink: true  };
+    if (diff === 0) return { label: "Aujourd'hui",                color: "#dc2626", bg: "#fef2f2", border: "#fecaca", pulse: true,  blink: false };
+    if (diff === 1) return { label: "Demain J-1",                 color: "#ea580c", bg: "#fff7ed", border: "#fed7aa", pulse: true,  blink: false };
+    if (diff <= 2)  return { label: `J-${diff}`,                  color: "#d97706", bg: "#fffbeb", border: "#fde68a", pulse: false, blink: false };
+    if (diff <= 6)  return { label: `J-${diff}`,                  color: "#ca8a04", bg: "#fefce8", border: "#fef08a", pulse: false, blink: false };
+    return           { label: `J-${diff}`,                        color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", pulse: false, blink: false };
   };
 
   const getDaysUntilOuverture = (task: Task): number | null => {
@@ -384,277 +401,115 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ── Layout principal : gauche = Parcours | droite = Documents ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+         {/* ── Layout principal : gauche = Parcours | droite = Documents ── */}
+<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-            {/* ── Colonne gauche — Parcours ── */}
-            <div className="lg:col-span-2">
-              {!parcours ? (
-                /* Pas de parcours → infos perso */
-                <div className="space-y-5">
-                  <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-100 shadow-xl p-8">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                        style={{ background: "rgba(0,174,239,0.1)", color: "#00AEEF" }}>
-                        <span className="text-xl">👤</span>
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-bold text-slate-900">Informations personnelles</h2>
-                        <p className="text-xs text-slate-400">Aucun parcours assigné pour le moment</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      {[
-                        { icon: "👤", label: "Nom complet", value: `${user?.prenom} ${user?.nom}` },
-                        { icon: "✉️", label: "Email",        value: user?.email },
-                        { icon: "💼", label: "Rôle",         value: user?.role },
-                        { icon: "📋", label: "Poste",        value: (user as any)?.poste || "Non affecté" },
-                      ].map((f, i) => (
-                        <div key={i} className="p-4 rounded-xl"
-                          style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
-                          <span className="text-xl">{f.icon}</span>
-                          <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{f.label}</p>
-                          <p className="text-sm font-medium mt-0.5" style={{ color: "var(--text)" }}>{f.value}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-5 pt-4 border-t border-slate-100">
-                      <button onClick={() => navigate("/profile")}
-                        className="text-sm font-medium flex items-center gap-2" style={{ color: "#00AEEF" }}>
-                        Voir mon profil complet →
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* Parcours existant → timeline */
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-100 shadow-xl overflow-hidden">
-
-                  {/* Header parcours */}
-                  <div className="px-7 py-5 border-b flex items-center justify-between"
-                    style={{ borderColor: "var(--border)", background: "rgba(0,174,239,0.02)" }}>
-                    <div>
-                      <h2 className="text-lg font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>
-                        Mon parcours d'intégration
-                      </h2>
-                      <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
-                        {completed}/{total} tâches · débuté le {new Date(parcours.dateDebut).toLocaleDateString("fr-FR")}
-                      </p>
-                    </div>
-                    {/* Barre progression */}
-                    <div className="flex items-center gap-3">
-                      <div className="w-32 h-2 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
-                        <div className="h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${parcours.progression}%`, background: parcours.progression === 100 ? "#8DC63F" : "#00AEEF" }} />
-                      </div>
-                      <span className="text-sm font-bold" style={{
-                        color: parcours.progression === 100 ? "#8DC63F" : "#00AEEF", fontFamily: "Sora"
-                      }}>
-                        {parcours.progression}%
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Timeline des tâches */}
-                  <div className="px-7 py-5 space-y-0">
-                    {tasksList.length === 0 ? (
-                      <div className="text-center py-12">
-                        <span className="text-4xl">📋</span>
-                        <p className="text-sm mt-3" style={{ color: "var(--text-muted)" }}>Aucune tâche</p>
-                      </div>
-                    ) : (
-                      tasksList.map((task, index) => {
-                        const typeConf   = TASK_TYPE_CONFIG[task.taskType];
-                        const statutConf = STATUT_TASK[task.statut];
-                        const isLast     = index === tasksList.length - 1;
-                        const isLockedQuiz = isQuizLocked(task);
-                        const isLocked   = task.verrouille || isLockedQuiz;
-                        const isSelected = selectedTask?.id === task.id && showTaskPanel;
-                        const iAmActeur  = canActOnTask(task);
-
-                        return (
-                          <div key={task.id} className="flex gap-4">
-                            {/* Ligne timeline */}
-                            <div className="flex flex-col items-center flex-shrink-0">
-                              {/* Cercle statut */}
-                              <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all"
-                                style={{
-                                  background: isLocked ? "var(--border)"
-                                    : task.statut === "TERMINE" ? "#8DC63F"
-                                    : task.statut === "EN_COURS" ? "#00AEEF"
-                                    : task.statut === "REJETE" ? "#dc2626"
-                                    : typeConf.bg,
-                                  border: isSelected ? `3px solid ${typeConf.color}` : "2px solid transparent",
-                                  boxShadow: isSelected ? `0 0 0 3px ${typeConf.color}22` : "none",
-                                }}>
-                                {isLocked ? "🔒"
-                                  : task.statut === "TERMINE" ? "✓"
-                                  : task.statut === "REJETE" ? "✕"
-                                  : typeConf.icon}
-                              </div>
-                              {/* Ligne verticale */}
-                              {!isLast && (
-                                <div className="w-0.5 flex-1 min-h-6 mt-1 mb-1 rounded-full"
-                                  style={{ background: task.statut === "TERMINE" ? "#8DC63F" : "var(--border)" }} />
-                              )}
-                            </div>
-
-                            {/* Contenu tâche */}
-                            <div className={`flex-1 pb-5 ${isLast ? "" : ""}`}>
-                              <div
-                                onClick={() => !isLocked && handleOpenTask(task)}
-                                className="rounded-2xl p-4 transition-all duration-200 group"
-                                style={{
-                                  cursor: isLocked ? "not-allowed" : "pointer",
-                                  opacity: isLocked ? 0.5 : 1,
-                                  background: isSelected ? `${typeConf.bg}` : "var(--bg)",
-                                  border: isSelected
-                                    ? `1.5px solid ${typeConf.color}44`
-                                    : task.statut === "TERMINE"
-                                    ? "1px solid rgba(141,198,63,0.2)"
-                                    : "1px solid var(--border)",
-                                }}>
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <p className="font-semibold text-sm" style={{ color: "var(--text)", fontFamily: "Sora" }}>
-                                        {task.titre}
-                                      </p>
-                                      {task.obligatoire && (
-                                        <span className="text-xs" style={{ color: "#dc2626" }}>*</span>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                      <span className="text-xs px-2 py-0.5 rounded-full"
-                                        style={{ background: typeConf.bg, color: typeConf.color }}>
-                                        {typeConf.icon} {typeConf.label}
-                                      </span>
-                                      <span className="text-xs px-2 py-0.5 rounded-full"
-                                        style={{ background: statutConf.bg, color: statutConf.color }}>
-                                        {statutConf.label}
-                                      </span>
-                                      {task.echeance && task.statut !== "TERMINE" && (
-                                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                                          ⏱ {new Date(task.echeance).toLocaleDateString("fr-FR")}
-                                        </span>
-                                      )}
-                                      {task.taskType === "QUIZ" && task.scoreObtenu !== undefined && task.scoreObtenu > 0 && (
-                                        <span className="text-xs font-semibold"
-                                          style={{ color: task.scoreObtenu >= (task.config?.scoreMinimum ?? 70) ? "#8DC63F" : "#dc2626" }}>
-                                          {task.scoreObtenu}%
-                                        </span>
-                                      )}
-                                      {/* Acteurs de la tâche */}
-                                      {task.typeActeurs?.map(a => (
-                                        <span key={a} className="text-xs px-1.5 py-0.5 rounded-full"
-                                          style={{ background: "var(--bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
-                                          {ACTEUR_LABELS[a]}
-                                        </span>
-                                      ))}
-                                      {!iAmActeur && (
-                                        <span className="text-xs px-1.5 py-0.5 rounded-full"
-                                          style={{ background: "rgba(148,163,184,0.1)", color: "#94a3b8" }}>
-                                          👁 Info
-                                        </span>
-                                      )}
-                                      {isLockedQuiz && (
-                                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600">
-                                          🔒 Disponible dans {getDaysUntilOuverture(task)} jour(s)
-                                        </span>
-                                      )}
-                                    </div>
-                                    {/* Description courte */}
-                                    {task.description && (
-                                      <p className="text-xs mt-1.5 line-clamp-1" style={{ color: "var(--text-muted)" }}>
-                                        {task.description}
-                                      </p>
-                                    )}
-                                  </div>
-
-                                  {/* Bouton action */}
-                                  {!isLocked && task.statut !== "TERMINE" && (
-                                    <button type="button"
-                                      onClick={(e) => { e.stopPropagation(); handleOpenTask(task); }}
-                                      className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition hover:scale-105"
-                                      style={{ background: typeConf.bg, color: typeConf.color, border: `1px solid ${typeConf.color}33` }}>
-                                      {task.statut === "EN_COURS" ? "Continuer →" : "Commencer →"}
-                                    </button>
-                                  )}
-                                  {task.statut === "TERMINE" && (
-                                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                                      style={{ background: "#8DC63F" }}>
-                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                                        <polyline points="20 6 9 17 4 12"/>
-                                      </svg>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Barre progression tâche */}
-                                {task.statut === "EN_COURS" && task.progression > 0 && task.progression < 100 && (
-                                  <div className="mt-3 w-full h-1 rounded-full" style={{ background: "var(--border)" }}>
-                                    <div className="h-1 rounded-full transition-all"
-                                      style={{ width: `${task.progression}%`, background: "#00AEEF" }} />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
+  {/* ── Colonne gauche — Parcours (prend 2/3 de l'espace) ── */}
+  <div className="lg:col-span-2">
+    {!parcours ? (
+      /* Pas de parcours → infos perso */
+      <div className="space-y-5">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-100 shadow-xl p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: "rgba(0,174,239,0.1)", color: "#00AEEF" }}>
+              <span className="text-xl">👤</span>
             </div>
-
-            {/* ── Colonne droite — Documents + Progression profil ── */}
-            <div className="space-y-5">
-
-              {/* Progression profil */}
-              {completion < 100 && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-100 shadow-xl p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                      style={{ background: "rgba(141,198,63,0.1)" }}>
-                      <span className="text-lg">📊</span>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900">Profil</h3>
-                      <p className="text-xs text-slate-400">Complétion</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="relative w-16 h-16 flex-shrink-0">
-                      <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36">
-                        <circle cx="18" cy="18" r="14" fill="none" stroke="var(--border)" strokeWidth="3" />
-                        <circle cx="18" cy="18" r="14" fill="none"
-                          stroke={completion === 100 ? "#8DC63F" : "#00AEEF"}
-                          strokeWidth="3"
-                          strokeDasharray={`${completion} 100`}
-                          strokeLinecap="round" />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-xs font-bold" style={{ color: "#00AEEF" }}>{completion}%</span>
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-                        {missingCount} champ{missingCount > 1 ? "s" : ""} manquant{missingCount > 1 ? "s" : ""}
-                      </p>
-                      <button onClick={() => navigate("/profile")}
-                        className="text-xs mt-1 font-medium" style={{ color: "#00AEEF" }}>
-                        Compléter →
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Documents entreprise */}
-              <CompanyDocumentsWidget />
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Informations personnelles</h2>
+              <p className="text-xs text-slate-400">Aucun parcours assigné pour le moment</p>
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { icon: "👤", label: "Nom complet", value: `${user?.prenom} ${user?.nom}` },
+              { icon: "✉️", label: "Email",        value: user?.email },
+              { icon: "💼", label: "Rôle",         value: user?.role },
+              { icon: "📋", label: "Poste",        value: (user as any)?.poste || "Non affecté" },
+            ].map((f, i) => (
+              <div key={i} className="p-4 rounded-xl"
+                style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                <span className="text-xl">{f.icon}</span>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{f.label}</p>
+                <p className="text-sm font-medium mt-0.5" style={{ color: "var(--text)" }}>{f.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 pt-4 border-t border-slate-100">
+            <button onClick={() => navigate("/profile")}
+              className="text-sm font-medium flex items-center gap-2" style={{ color: "#00AEEF" }}>
+              Voir mon profil complet →
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : (
+      /* Parcours existant → ParcoursWidget */
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-100 shadow-xl overflow-hidden">
+        <ParcoursWidget
+          mode="compact"
+          selectedTaskId={selectedTask?.id}
+          onTaskSelect={(task) => {
+            setSelectedTask(task);
+            setShowTaskPanel(true);
+            setQuizReponses([]);
+            setQuizSubmitted(false);
+            setQuizResult(null);
+            setDocFile(null);
+            setSuccessMsg("");
+            setErrorMsg("");
+          }}
+        />
+      </div>
+    )}
+  </div>
+
+  {/* ── Colonne droite — Documents entreprise (prend 1/3 de l'espace) ── */}
+  <div className="lg:col-span-1 space-y-5">
+    {/* Progression profil */}
+    {completion < 100 && (
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-100 shadow-xl p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: "rgba(141,198,63,0.1)" }}>
+            <span className="text-lg">📊</span>
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Profil</h3>
+            <p className="text-xs text-slate-400">Complétion</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="relative w-16 h-16 flex-shrink-0">
+            <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="14" fill="none" stroke="var(--border)" strokeWidth="3" />
+              <circle cx="18" cy="18" r="14" fill="none"
+                stroke={completion === 100 ? "#8DC63F" : "#00AEEF"}
+                strokeWidth="3"
+                strokeDasharray={`${completion} 100`}
+                strokeLinecap="round" />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-xs font-bold" style={{ color: "#00AEEF" }}>{completion}%</span>
+            </div>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+              {missingCount} champ{missingCount > 1 ? "s" : ""} manquant{missingCount > 1 ? "s" : ""}
+            </p>
+            <button onClick={() => navigate("/profile")}
+              className="text-xs mt-1 font-medium" style={{ color: "#00AEEF" }}>
+              Compléter →
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Documents entreprise */}
+    <CompanyDocumentsWidget />
+  </div>
+</div>
         </div>
       </main>
 
@@ -686,11 +541,17 @@ const DashboardPage = () => {
                         style={{ background: statutConf.bg, color: statutConf.color }}>
                         {statutConf.label}
                       </span>
-                      {selectedTask.echeance && (
-                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                          ⏱ {new Date(selectedTask.echeance).toLocaleDateString("fr-FR")}
-                        </span>
-                      )}
+                      {(() => {
+                        const ec = getEcheanceConfig(selectedTask.echeance, selectedTask.statut);
+                        if (!ec) return null;
+                        return (
+                          <span
+                            className={`text-xs px-2.5 py-1 rounded-full font-semibold ${ec.pulse ? "badge-pulse" : ec.blink ? "badge-blink" : ""}`}
+                            style={{ background: ec.bg, color: ec.color, border: `1px solid ${ec.border}` }}>
+                            {ec.pulse || ec.blink ? "⚠ " : "⏱ "}{ec.label} · {new Date(selectedTask.echeance!).toLocaleDateString("fr-FR")}
+                          </span>
+                        );
+                      })()}
                       {selectedTask.typeActeurs?.map(a => (
                         <span key={a} className="text-xs px-1.5 py-0.5 rounded-full"
                           style={{ background: "var(--bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
@@ -1167,6 +1028,17 @@ const DashboardPage = () => {
           50% { background-position: 100% 50%; }
         }
         .animate-gradient-x { animation: gradient-x 15s ease infinite; }
+
+        @keyframes pulse-badge {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 0.7; transform: scale(1.08); }
+        }
+        @keyframes blink-badge {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.35; }
+        }
+        .badge-pulse { animation: pulse-badge 1.4s ease-in-out infinite; }
+        .badge-blink { animation: blink-badge 1s ease-in-out infinite; }
       `}</style>
     </div>
   );
