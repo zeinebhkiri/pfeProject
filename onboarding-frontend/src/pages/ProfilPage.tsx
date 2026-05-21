@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUserApi, updateMyProfileApi, getAffectationByUserApi, getAllManagersApi,getPositionsApi, getAllUsersApi, getUserByIdApi } from "../api/authApi";
+import { getCurrentUserApi, updateMyProfileApi, getAffectationByUserApi, getPositionsApi, getMyManagerApi, getMyTasksApi, getMyParcoursApi } from "../api/authApi";
 import { useAuth } from "../hooks/useAuth";
 import Sidebar from "../components/Sidebar";
-import type { StatutCompte, UserProfile, UserRole , ProfessionalInfo, Position} from "../types/auth";
+import type { StatutCompte, UserProfile, UserRole , ProfessionalInfo, Position, Task, Parcours} from "../types/auth";
 import DocumentsSection from "../components/DocumentsSection";
+import BadgesWidget from "../components/BadgesWidget";
 
 const statutConfig: Record<string, { label: string; class: string; icon: string }> = {
   EN_ATTENTE: { label: "En attente d'activation", class: "bg-amber-50 text-amber-700 border border-amber-200", icon: "⏳" },
@@ -67,15 +68,28 @@ const [sensitiveFieldsLocked, setSensitiveFieldsLocked] = useState({
     retry: false,
   });
 
-  const { data: managers } = useQuery({
-    queryKey: ["managers"],
-    queryFn: getAllManagersApi,
-    enabled: true,
-  });
+ 
+  const { data: myManager, isLoading: loadingManager } = useQuery({
+  queryKey: ["myManager"],
+  queryFn: getMyManagerApi,
+  enabled: (role === "SALARIE" || role === "MANAGER") && !!affectation?.managerId, // ⭐ Seulement pour les salariés avec manager
+  retry: 1,
+  staleTime: 5 * 60 * 1000, // Cache pendant 5 minutes
+});
 
   const { data: positions = [] } = useQuery({
   queryKey: ["positions"],
   queryFn: getPositionsApi,
+});
+const { data: myTasks = [] } = useQuery<Task[]>({
+  queryKey: ["myTasks"],
+  queryFn: getMyTasksApi,
+  retry: false,
+});
+const { data: myParcours } = useQuery<Parcours>({
+  queryKey: ["myParcours"],
+  queryFn: getMyParcoursApi,
+  retry: false,
 });
 
   useEffect(() => {
@@ -90,6 +104,7 @@ const [sensitiveFieldsLocked, setSensitiveFieldsLocked] = useState({
       setStatutSocial(user.profile.statutSocial || "");
       setNationalite(user.profile.nationalite || "");
       setGenre(user.profile.genre || "");
+
       if (user.profile.photoPoste) setPhotoPostePreview(user.profile.photoPoste);
           // ⭐ Si un champ sensible a déjà une valeur, on le bloque
     setSensitiveFieldsLocked({
@@ -194,12 +209,7 @@ const handleSubmit = (e: React.FormEvent) => {
     reader.readAsDataURL(file);
   };
 
-  const managerNom = affectation?.managerId
-    ? managers?.find((m: any) => m.id === affectation.managerId)
-      ? `${managers.find((m: any) => m.id === affectation.managerId)!.prenom} ${managers.find((m: any) => m.id === affectation.managerId)!.nom}`
-      : null
-    : null;
-
+  const managerNom = myManager ? `${myManager.prenom} ${myManager.nom}` : null;
   const joursRestants = user?.dateLimit
     ? Math.ceil((new Date(user.dateLimit).getTime() - Date.now()) / 86400000)
     : null;
@@ -220,7 +230,8 @@ const validateAge = (dateNaissance: string): boolean => {
   const fields = [
     { label: "Adresse",          value: user?.profile?.adresse,       state: adresse,       setState: setAdresse,       placeholder: "12 rue de la Paix", type: "text",        icon: "🏠", description: "Votre adresse postale complète" },
     { label: "RIB",              value: user?.profile?.rib,           state: rib,           setState: setRib,           placeholder: "FR76 3000 6000...", type: "text",        icon: "🏦", description: "Format IBAN" },
-    { label: "Téléphone",        value: user?.profile?.telephone,     state: telephone,     setState: setTelephone,     placeholder: "+216 XX XXX XXX",   type: "tel",         icon: "📱", description: "Numéro mobile ou fixe" },
+    { label: "Téléphone",        value: user?.profile?.telephone,     state: telephone,    setState: (value : string) => {
+   const numbersOnly = value.replace(/\D/g, '');if (numbersOnly.length <= 8) { setTelephone(numbersOnly);}}, placeholder: "+216 XX XXX XXX",   type: "tel",         icon: "📱", description: "Numéro mobile ou fixe" },
     { label: "Numéro CNSS",      value: user?.profile?.numeroCnss,    state: numeroCnss,    setState: setNumeroCnss,    placeholder: "12345678",          type: "text",        icon: "🪪", description: "Numéro de sécurité sociale" },
     { label: "Date de naissance",value: user?.profile?.dateNaissance, state: dateNaissance, setState: setDateNaissance, placeholder: "",                  type: "date",        icon: "🎂", description: "Votre date de naissance" },
     { label: "Lieu de naissance",value: user?.profile?.lieuNaissance, state: lieuNaissance, setState: setLieuNaissance, placeholder: "Tunis",             type: "text",        icon: "📍", description: "Ville de naissance" },
@@ -375,7 +386,7 @@ const validateAge = (dateNaissance: string): boolean => {
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
                             style={{ background: "rgba(0,174,239,0.3)" }}>
-                            M
+                              {managerNom.split(" ").map(n => n[0]).join("")}
                           </div>
                           <span className="text-sm" style={{ color: "rgba(168,216,234,0.9)" }}>{managerNom}</span>
                         </div>
@@ -474,16 +485,16 @@ const validateAge = (dateNaissance: string): boolean => {
                     </span>
                   </div>
                 </div>
-                <div className="w-full space-y-1.5 mt-2">
+                {/*<div className="w-full space-y-1.5 mt-2">
                   {fields.slice(0, 5).map((f) => (
                     <div key={f.label} className="flex items-center justify-between text-xs">
                       <span style={{ color: "var(--text-muted)" }}>{f.label}</span>
                       <span className={`px-1.5 py-0.5 rounded-full text-xs ${f.value ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                         {f.value ? "✓" : "○"}
                       </span>
-                    </div>
+                    </div>*
                   ))}
-                </div>
+                </div>*/}
               </div>
             </div>
           </div>
@@ -667,7 +678,7 @@ const validateAge = (dateNaissance: string): boolean => {
       );
     })}
   </div>
-
+   
   <div className="flex gap-3">
     <button 
       type="submit" 
@@ -690,7 +701,10 @@ const validateAge = (dateNaissance: string): boolean => {
               )}
             </div>
           </div>
-
+           {/* ── Gamification / Badges ── */}
+          {(myTasks.length > 0 || myParcours) && (
+            <BadgesWidget tasks={myTasks} parcours={myParcours} />
+          )}
           {/* ── Documents ── */}
           <DocumentsSection
             documents={user?.profile?.documents ?? []}

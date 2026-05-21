@@ -32,7 +32,7 @@ public class ParcoursController {
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable."));
         return parcoursRepository.findByUserId(user.getId())
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElse(ResponseEntity.ok(null));
     }
 
     // ── Mes tâches (salarié connecté) ────────────────────────────────────────
@@ -45,7 +45,7 @@ public class ParcoursController {
                 .map(p -> ResponseEntity.ok(
                         taskRepository.findByParcoursIdOrderByOrdreAsc(p.getId())
                 ))
-                .orElse(ResponseEntity.notFound().build());
+                .orElse(ResponseEntity.ok(List.of()));
     }
 
     // ── Parcours d'un salarié (admin/manager) ────────────────────────────────

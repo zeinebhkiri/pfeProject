@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+
 import {
   getUserByIdApi,
   validateUserApi,
@@ -17,18 +19,21 @@ import { useAuth } from "../hooks/useAuth";
 import DocumentsReadOnly from "../components/DocumentsReadOnly";
 
 const statutConfig: Record<string, { label: string; class: string }> = {
-  EN_ATTENTE: { label: "En attente",   class: "bg-amber-50 text-amber-700 border border-amber-200" },
-  ACCEPTE:    { label: "Profil soumis",class: "bg-blue-50 text-blue-700 border border-blue-200" },
-  VALIDE:     { label: "Validé",       class: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
-  DESACTIVE:  { label: "Désactivé",    class: "bg-slate-100 text-slate-500 border border-slate-200" },
-  EXPIRE:     { label: "Expiré",       class: "bg-orange-50 text-orange-600 border border-orange-200" },
+  EN_ATTENTE: { label: "En attente", class: "bg-amber-50 text-amber-700 border border-amber-200" },
+  ACCEPTE: { label: "Profil soumis", class: "bg-blue-50 text-blue-700 border border-blue-200" },
+  VALIDE: { label: "Validé", class: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+  DESACTIVE: { label: "Désactivé", class: "bg-slate-100 text-slate-500 border border-slate-200" },
+  EXPIRE: { label: "Expiré", class: "bg-orange-50 text-orange-600 border border-orange-200" },
 };
 
 const SalarieProfilePage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { role } = useAuth();
+  const { role , userId} = useAuth();
   const queryClient = useQueryClient();
+
+  const location = useLocation();
+  const scrollTo = location.state?.scrollTo;
 
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -48,7 +53,7 @@ const SalarieProfilePage = () => {
   const [modifyProfessionalInfo, setModifyProfessionalInfo] = useState(false);
   const [datePriseDePoste, setDatePriseDePoste] = useState("");
   const [affectationDatePriseDePoste, setAffectationDatePriseDePoste] = useState("");
-  
+
   // ⚡ Ajout d'un état pour savoir si la date est personnalisée
   const [isDatePrisePostePersonnalisee, setIsDatePrisePostePersonnalisee] = useState(false);
 
@@ -69,7 +74,7 @@ const SalarieProfilePage = () => {
   const { data: managers } = useQuery({
     queryKey: ["managers"],
     queryFn: getAllManagersApi,
-    enabled: !!user && user.statutCompte === "VALIDE" && user.role !== "MANAGER",
+    enabled: !!user && user.statutCompte === "VALIDE" ,
   });
 
   const { data: positions = [] } = useQuery({
@@ -82,18 +87,18 @@ const SalarieProfilePage = () => {
   useEffect(() => {
     if (user?.professionalInfo) {
       console.log("Initialisation des données professionnelles:", user.professionalInfo);
-      
+
       // Email et téléphone
       setProfessionalEmail(user.professionalInfo.emailProfessionnel || "");
       setProfessionalPhone(user.professionalInfo.telephoneProfessionnel || "");
-      
+
       // Date d'embauche
       const hireDate = user.professionalInfo.dateEmbauche || "";
       setProfessionalHireDate(hireDate);
-      
+
       // Date de prise de poste - priorité à la date personnalisée
       let prisePoste = user.professionalInfo.datePriseDePoste || "";
-      
+
       // Si pas de date de prise de poste mais date d'embauche existe, utiliser date d'embauche
       if (!prisePoste && hireDate) {
         prisePoste = hireDate;
@@ -103,7 +108,7 @@ const SalarieProfilePage = () => {
         setIsDatePrisePostePersonnalisee(true);
         console.log("Date prise de poste personnalisée existante:", prisePoste);
       }
-      
+
       setDatePriseDePoste(prisePoste);
       setAffectationDatePriseDePoste(prisePoste);
     }
@@ -118,6 +123,25 @@ const SalarieProfilePage = () => {
     }
   }, [professionalHireDate, isDatePrisePostePersonnalisee]);
 
+  useEffect(() => {
+    if (scrollTo !== "affectation-section") return;
+
+    const scroll = () => {
+      const el = document.getElementById("affectation-section");
+
+      if (el) {
+        el.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      } else {
+        requestAnimationFrame(scroll);
+      }
+    };
+
+    scroll();
+  }, [scrollTo, user]);
+
   // ── Mutations ─────────────────────────────────────────────────────────────
   const validateMutation = useMutation({
     mutationFn: () => validateUserApi(id!),
@@ -126,6 +150,12 @@ const SalarieProfilePage = () => {
       setErrorMsg("");
       queryClient.invalidateQueries({ queryKey: ["userById", id] });
       queryClient.invalidateQueries({ queryKey: ["allUsers"] });
+      setTimeout(() => {
+        document
+          .getElementById("affectation-section")
+          ?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+
     },
     onError: (error: any) => {
       setErrorMsg(error.response?.data?.error || "Erreur lors de la validation.");
@@ -143,14 +173,22 @@ const SalarieProfilePage = () => {
     onError: () => setErrorMsg("Erreur lors de l'envoi de l'email."),
   });
 
+  // Modification de la mutation d'affectation - Ne pas envoyer managerId si l'utilisateur est MANAGER
   const affectationMutation = useMutation({
-    mutationFn: () =>
-      createAffectationApi({
+    mutationFn: () => {
+      const payload: any = {
         userId: id!,
         positionId: affectationPositionId,
-        managerId: user?.role === "MANAGER" ? undefined : affectationManagerId,
         datePriseDePoste: affectationDatePriseDePoste || undefined,
-      }),
+      };
+
+      // Ne pas inclure managerId si l'utilisateur connecté est MANAGER
+      if (role !== "MANAGER") {
+        payload.managerId = affectationManagerId;
+      }
+
+      return createAffectationApi(payload);
+    },
     onSuccess: () => {
       setSuccessMsg("Affectation créée avec succès !");
       setErrorMsg("");
@@ -178,17 +216,17 @@ const SalarieProfilePage = () => {
   // ── Helpers ───────────────────────────────────────────────────────────────
   const handleProfessionalInfoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Si la date de prise de poste est différente de la date d'embauche, marquer comme personnalisée
     const isPersonnalisee = datePriseDePoste !== professionalHireDate;
     setIsDatePrisePostePersonnalisee(isPersonnalisee);
-    
+
     console.log("Soumission formulaire:", {
       dateEmbauche: professionalHireDate,
       datePriseDePoste: datePriseDePoste,
       personnalisee: isPersonnalisee
     });
-    
+
     professionalMutation.mutate({
       emailProfessionnel: professionalEmail,
       telephoneProfessionnel: professionalPhone,
@@ -200,11 +238,11 @@ const SalarieProfilePage = () => {
   const resetProfessionalForm = () => {
     const hireDate = user?.professionalInfo?.dateEmbauche || "";
     let prisePoste = user?.professionalInfo?.datePriseDePoste || "";
-    
+
     if (!prisePoste && hireDate) {
       prisePoste = hireDate;
     }
-    
+
     setProfessionalEmail(user?.professionalInfo?.emailProfessionnel || "");
     setProfessionalPhone(user?.professionalInfo?.telephoneProfessionnel || "");
     setProfessionalHireDate(hireDate);
@@ -368,7 +406,7 @@ const SalarieProfilePage = () => {
 
                 {user.statutCompte === "ACCEPTE" && completion === 100 && (
                   <button type="button"
-                    onClick={() => validateMutation.mutate()}
+                    onClick={() => { validateMutation.mutate(); }}
                     disabled={validateMutation.isPending}
                     className="btn-success w-full py-2.5">
                     {validateMutation.isPending ? (
@@ -428,8 +466,8 @@ const SalarieProfilePage = () => {
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center"
                     style={{ background: "rgba(0,174,239,0.1)" }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00AEEF" strokeWidth="2">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                      <circle cx="12" cy="7" r="4"/>
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
                     </svg>
                   </div>
                   <p className="text-xs font-semibold uppercase tracking-wide"
@@ -439,25 +477,31 @@ const SalarieProfilePage = () => {
                 </div>
                 <div style={{ borderTop: "1px solid var(--border)" }}>
                   {[
-                    { label: "Nom complet",       value: `${user.prenom} ${user.nom}` },
-                    { label: "Email",              value: user.email },
-                    { label: "Adresse",            value: user.profile?.adresse },
-                    { label: "RIB",                value: user.profile?.rib },
-                    { label: "Banque",             value: user.profile?.nomBanque },
-                    { label: "Téléphone",          value: user.profile?.telephone },
-                    { label: "CNSS",               value: user.profile?.numeroCnss },
-                    { label: "Date de naissance",  value: user.profile?.dateNaissance
+                    { label: "Nom complet", value: `${user.prenom} ${user.nom}` },
+                    { label: "Email", value: user.email },
+                    { label: "Adresse", value: user.profile?.adresse },
+                    { label: "RIB", value: user.profile?.rib },
+                    { label: "Banque", value: user.profile?.nomBanque },
+                    { label: "Téléphone", value: user.profile?.telephone },
+                    { label: "CNSS", value: user.profile?.numeroCnss },
+                    {
+                      label: "Date de naissance", value: user.profile?.dateNaissance
                         ? new Date(user.profile.dateNaissance).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
-                        : undefined },
-                    { label: "Lieu de naissance",  value: user.profile?.lieuNaissance },
-                    { label: "Genre",              value: user.profile?.genre },
-                    { label: "Statut social",      value: user.profile?.statutSocial },
-                    { label: "Créé le",            value: user.dateCreation
+                        : undefined
+                    },
+                    { label: "Lieu de naissance", value: user.profile?.lieuNaissance },
+                    { label: "Genre", value: user.profile?.genre },
+                    { label: "Statut social", value: user.profile?.statutSocial },
+                    {
+                      label: "Créé le", value: user.dateCreation
                         ? new Date(user.dateCreation).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
-                        : undefined },
-                    { label: "Validé le",          value: user.dateValidation
+                        : undefined
+                    },
+                    {
+                      label: "Validé le", value: user.dateValidation
                         ? new Date(user.dateValidation).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
-                        : undefined },
+                        : undefined
+                    },
                   ].map((f) => (
                     <div key={f.label} className="flex justify-between items-center py-3"
                       style={{ borderBottom: "1px solid var(--border)" }}>
@@ -479,8 +523,8 @@ const SalarieProfilePage = () => {
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center"
                         style={{ background: "rgba(141,198,63,0.1)" }}>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8DC63F" strokeWidth="2">
-                          <rect x="2" y="7" width="20" height="14" rx="2"/>
-                          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                          <rect x="2" y="7" width="20" height="14" rx="2" />
+                          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
                         </svg>
                       </div>
                       <div>
@@ -508,15 +552,15 @@ const SalarieProfilePage = () => {
                       {[
                         { label: "Email professionnel", value: user.professionalInfo?.emailProfessionnel, icon: "✉️" },
                         { label: "Téléphone professionnel", value: user.professionalInfo?.telephoneProfessionnel, icon: "📱" },
-                        { 
-                          label: "Date d'embauche", 
+                        {
+                          label: "Date d'embauche",
                           value: user.professionalInfo?.dateEmbauche
                             ? new Date(user.professionalInfo.dateEmbauche).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
                             : undefined,
-                          icon: "📅" 
+                          icon: "📅"
                         },
-                        { 
-                          label: "Date de prise de poste",   
+                        {
+                          label: "Date de prise de poste",
                           value: (() => {
                             const date = user.professionalInfo?.datePriseDePoste || user.professionalInfo?.dateEmbauche;
                             return date
@@ -571,11 +615,11 @@ const SalarieProfilePage = () => {
                             style={{ color: "var(--text-muted)" }}>
                             Date d'embauche
                           </label>
-                          <input 
-                            type="date" 
+                          <input
+                            type="date"
                             value={professionalHireDate}
                             onChange={(e) => setProfessionalHireDate(e.target.value)}
-                            className="input-field" 
+                            className="input-field"
                           />
                         </div>
                         <div>
@@ -647,13 +691,13 @@ const SalarieProfilePage = () => {
 
               {/* Affectation — seulement si VALIDE */}
               {user.statutCompte === "VALIDE" && (
-                <div className="card p-6">
+                <div id="affectation-section" className="card p-6">
                   <div className="flex items-center gap-3 mb-5">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center"
                       style={{ background: "rgba(0,174,239,0.1)" }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00AEEF" strokeWidth="2">
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                        <circle cx="12" cy="10" r="3"/>
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
                       </svg>
                     </div>
                     <p className="text-xs font-semibold uppercase tracking-wide"
@@ -667,19 +711,7 @@ const SalarieProfilePage = () => {
                       <div className="rounded-2xl p-5 space-y-3"
                         style={{ background: "rgba(0,174,239,0.05)", border: "1px solid rgba(0,174,239,0.2)" }}>
                         {[
-                          { label: "Poste",
-                            value: getPosteLabel(affectation.positionId),
-                            bold: true },
-                          { label: "Manager",
-                            value: affectation.managerId
-                              ? managers?.find((m: User) => m.id === affectation.managerId)
-                                ? `${managers.find((m: User) => m.id === affectation.managerId)!.prenom} ${managers.find((m: User) => m.id === affectation.managerId)!.nom}`
-                                : affectation.managerId
-                              : "Aucun (Manager)" },
-                               { label: "Date de prise de poste",
-                            value: new Date(affectationDatePriseDePoste || professionalHireDate || "").toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) },
-                          { label: "Date d'affectation",
-                            value: new Date(affectation.dateAffectation).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) },
+                          { label: "Poste", value: getPosteLabel(affectation.positionId), bold: true },
                         ].map((f) => (
                           <div key={f.label} className="flex justify-between items-center">
                             <span className="text-sm" style={{ color: "#00AEEF" }}>{f.label}</span>
@@ -688,6 +720,32 @@ const SalarieProfilePage = () => {
                             </span>
                           </div>
                         ))}
+
+                        
+                        {role !== "MANAGER" && affectation.managerId && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm" style={{ color: "#00AEEF" }}>Manager</span>
+                            <span className="text-sm" style={{ color: "#0D1B3E", fontWeight: 500 }}>
+                              👨‍💼 {managers?.find((m: User) => m.id === affectation.managerId)
+                                ? `${managers.find((m: User) => m.id === affectation.managerId)!.prenom} ${managers.find((m: User) => m.id === affectation.managerId)!.nom}`
+                                : affectation.managerId}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm" style={{ color: "#00AEEF" }}>Date de prise de poste</span>
+                          <span className="text-sm" style={{ color: "#0D1B3E", fontWeight: 500 }}>
+                            📅 {new Date(affectationDatePriseDePoste || professionalHireDate || "").toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                          </span>
+                        </div>
+                        {/*date d'affectation */}
+                        {/*<div className="flex justify-between items-center">
+                          <span className="text-sm" style={{ color: "#00AEEF" }}>Date d'affectation</span>
+                          <span className="text-sm" style={{ color: "#0D1B3E", fontWeight: 500 }}>
+                            📅 {new Date(affectation.dateAffectation).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                          </span>
+                        </div>*/}
                       </div>
                       <button type="button"
                         onClick={() => {
@@ -726,8 +784,8 @@ const SalarieProfilePage = () => {
                         </select>
                       </div>
 
-                      {/* Select manager — caché pour les managers */}
-                      {user.role !== "MANAGER" && (
+                      
+                      {role === "ADMIN" && (
                         <div>
                           <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide"
                             style={{ color: "var(--text-muted)" }}>
@@ -738,7 +796,9 @@ const SalarieProfilePage = () => {
                             onChange={(e) => setAffectationManagerId(e.target.value)}
                             className="input-field">
                             <option value="">— Sélectionner un manager —</option>
-                            {(managers ?? []).map((m: User) => (
+                            {(managers ?? [])
+                            .filter((m: User) => m.id !== user.id)
+                            .map((m: User) => (
                               <option key={m.id} value={m.id}>
                                 {m.prenom} {m.nom}
                               </option>
@@ -748,7 +808,7 @@ const SalarieProfilePage = () => {
                       )}
 
                       <div>
-                        <label 
+                        <label
                           htmlFor="datePrisePoste"
                           className="block text-xs font-semibold mb-1.5 uppercase tracking-wide"
                           style={{ color: "var(--text-muted)" }}
@@ -765,49 +825,64 @@ const SalarieProfilePage = () => {
                           name="datePrisePoste"
                           value={affectationDatePriseDePoste || professionalHireDate || ""}
                           onChange={(e) => setAffectationDatePriseDePoste(e.target.value)}
+                           min={(() => {
+                            const demain = new Date();
+                            demain.setDate(demain.getDate() + 3);
+                            return demain.toISOString().split('T')[0];
+                          })()}
                           className="input-field"
                         />
                         <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                          {affectationDatePriseDePoste || professionalHireDate 
+                          {affectationDatePriseDePoste || professionalHireDate
                             ? `📅 Date de référence: ${new Date(affectationDatePriseDePoste || professionalHireDate).toLocaleDateString("fr-FR")}`
                             : "Les échéances des tâches du parcours seront calculées depuis cette date."}
                         </p>
                       </div>
 
                       {/* Récapitulatif */}
-                      {affectationPositionId && (user.role === "MANAGER" || affectationManagerId) && (
+                      {affectationPositionId && (role === "MANAGER" || role === "ADMIN" && affectationManagerId) && (
                         <div className="rounded-xl p-4 space-y-2"
                           style={{ background: "rgba(0,174,239,0.05)", border: "1px solid rgba(0,174,239,0.2)" }}>
                           <p className="text-xs font-semibold uppercase tracking-wide mb-3"
                             style={{ color: "#00AEEF" }}>
                             Récapitulatif de l'affectation
                           </p>
-                          {[
-                            { label: "Salarié", value: `${user.prenom} ${user.nom}` },
-                            { label: "Poste",   value: selectedPosition?.titre ?? "" },
-                            ...(user.role !== "MANAGER" && selectedManager
-                              ? [{ label: "Manager", value: `${selectedManager.prenom} ${selectedManager.nom}` }]
-                              : []),
-                            { label: "Date de prise de poste", value: affectationDatePriseDePoste || professionalHireDate || "Non définie" },
-                          ].map((f) => (
-                            <div key={f.label} className="flex justify-between text-sm">
-                              <span style={{ color: "var(--text-muted)" }}>{f.label}</span>
-                              <span className="font-semibold" style={{ color: "#1A2B6B" }}>{f.value}</span>
+                          <div className="flex justify-between text-sm">
+                            <span style={{ color: "var(--text-muted)" }}>Salarié</span>
+                            <span className="font-semibold" style={{ color: "#1A2B6B" }}>{user.prenom} {user.nom}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span style={{ color: "var(--text-muted)" }}>Poste</span>
+                            <span className="font-semibold" style={{ color: "#1A2B6B" }}>{selectedPosition?.titre ?? ""}</span>
+                          </div>
+                          {/* Récapitulatif du manager uniquement pour ADMIN */}
+                          {role === "ADMIN" && selectedManager && (
+                            <div className="flex justify-between text-sm">
+                              <span style={{ color: "var(--text-muted)" }}>Manager</span>
+                              <span className="font-semibold" style={{ color: "#1A2B6B" }}>
+                                {selectedManager.prenom} {selectedManager.nom}
+                              </span>
                             </div>
-                          ))}
+                          )}
+                          <div className="flex justify-between text-sm">
+                            <span style={{ color: "var(--text-muted)" }}>Date de prise de poste</span>
+                            <span className="font-semibold" style={{ color: "#1A2B6B" }}>
+                              {affectationDatePriseDePoste || professionalHireDate || "Non définie"}
+                            </span>
+                          </div>
                         </div>
                       )}
 
                       <div className="flex gap-3">
                         <button type="button"
                           onClick={() => {
-                            if (affectationPositionId && (user.role === "MANAGER" || affectationManagerId)) {
+                            if (affectationPositionId && (role === "MANAGER" || (role === "ADMIN" && affectationManagerId))) {
                               affectationMutation.mutate();
                             }
                           }}
                           disabled={
                             !affectationPositionId ||
-                            (user.role !== "MANAGER" && !affectationManagerId) ||
+                            (role === "ADMIN" && !affectationManagerId) ||
                             affectationMutation.isPending
                           }
                           className="btn-primary flex-1 py-3">

@@ -7,5 +7,6 @@ import java.util.List;
 
 public interface PositionRepository extends MongoRepository<Position, String> {
     List<Position> findByActifTrue();
+    List<Position> findByActifFalse();
     boolean existsByTitre(String titre);
 }

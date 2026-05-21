@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getAllParcoursApi,
@@ -23,8 +23,6 @@ import {
 const TASK_TYPE_CONFIG: Record<TaskType, { label: string; icon: string; color: string; bg: string }> = {
   FORMATION:        { label: "Formation",        icon: "🎓", color: "#00AEEF", bg: "rgba(0,174,239,0.08)"   },
   QUIZ:             { label: "Quiz",             icon: "🧠", color: "#8DC63F", bg: "rgba(141,198,63,0.08)"  },
-  DOCUMENT_RH:      { label: "Document RH",      icon: "📄", color: "#1A2B6B", bg: "rgba(26,43,107,0.08)"  },
-  DOCUMENT_SALARIE: { label: "Document Salarié", icon: "📎", color: "#d97706", bg: "rgba(217,119,6,0.08)"  },
   ENTRETIEN:        { label: "Entretien",        icon: "🤝", color: "#7c3aed", bg: "rgba(124,58,237,0.08)" },
   SIMPLE:           { label: "Tâche simple",     icon: "✅", color: "#059669", bg: "rgba(5,150,105,0.08)"  },
 };
@@ -33,7 +31,6 @@ const STATUT_CONFIG = {
   NON_COMMENCE: { label: "À faire",  color: "#94a3b8", bg: "#f1f5f9" },
   EN_COURS:     { label: "En cours", color: "#2563eb", bg: "#eff6ff" },
   TERMINE:      { label: "Terminé",  color: "#059669", bg: "#ecfdf5" },
-  REJETE:       { label: "Rejeté",   color: "#dc2626", bg: "#fef2f2" },
 };
 
 const ACTEUR_LABELS: Record<string, string> = {
@@ -88,6 +85,7 @@ const AdminParcoursPage = () => {
   const [showEntretienModal, setShowEntretienModal] = useState(false);
   const [entretienDate, setEntretienDate]           = useState("");
   const [entretienFile, setEntretienFile]           = useState<File | null>(null);
+  const [reprogrammationRaison, setReprogrammationRaison] = useState("");
   const [commentText, setCommentText] = useState("");
   const [successMsg, setSuccessMsg]   = useState("");
   const [errorMsg, setErrorMsg]       = useState("");
@@ -104,17 +102,18 @@ const AdminParcoursPage = () => {
   };
 
   const needsRhAction = (task: Task): boolean => {
-    if (task.statut === "TERMINE" || task.statut === "REJETE") return false;
+    if (task.statut === "TERMINE") return false;
     if (!rhIsActeur(task)) return false;
     if (rhProgressionDone(task)) return false;
     return true;
   };
+  
 
   // ── Queries ───────────────────────────────────────────────────────
   const { data: allUsers = [],      isLoading: loadingUsers }      = useQuery({ queryKey: ["allUsers"],    queryFn: getAllUsersApi });
   const { data: allParcours = [],   isLoading: loadingAllParcours } = useQuery({ queryKey: ["allParcours"], queryFn: getAllParcoursApi });
   const { data: assignedTasks = [], isLoading: loadingAssigned }   = useQuery({ queryKey: ["assignedTasks"], queryFn: getAssignedTasksApi });
-  const { data: positions = [] }                                    = useQuery({ queryKey: ["positions"],   queryFn: getPositionsApi });
+  const { data: positions = [] } = useQuery({ queryKey: ["positions"],   queryFn: getPositionsApi });
 
   // ── Mutations ─────────────────────────────────────────────────────
   const validateMutation = useMutation({
@@ -157,6 +156,17 @@ const AdminParcoursPage = () => {
       }
     },
   });
+    const validRHTasks = useMemo(() => {
+    if (!assignedTasks.length || !allParcours.length || !allUsers.length) return [];
+    
+    return (assignedTasks as Task[])
+      .filter(t => needsRhAction(t))
+      .filter(task => {
+        const parcours = allParcours.find(p => p.id === task.parcoursId);
+        const user = parcours ? (allUsers as any[]).find(u => u.id === parcours.userId) : null;
+        return parcours && user;
+      });
+  }, [assignedTasks, allParcours, allUsers]);
 
   // ── Helpers ───────────────────────────────────────────────────────
   const getPositionTitre = (positionId: string) =>
@@ -164,7 +174,7 @@ const AdminParcoursPage = () => {
 
   const getUserById = (id: string) => (allUsers as any[]).find(u => u.id === id);
 
-  const getParcoursForUser = (uid: string) => (allParcours as Parcours[]).find(p => p.userId === uid);
+  const getParcoursForUser = (uid: string) => (allParcours as Parcours[]).find(p => p.userId === uid && p.statut === "EN_COURS");
 
   const handleSelectUser = async (uid: string) => {
     setSelectedUserId(uid);
@@ -195,6 +205,8 @@ const AdminParcoursPage = () => {
   const handlePlanifierEntretien = async () => {
     if (!selectedTask || !entretienDate) { setErrorMsg("La date est obligatoire."); return; }
     let docData: any = { dateEntretien: entretienDate };
+    if (selectedTask.dateEntretien && reprogrammationRaison) {
+    docData.commentaire = reprogrammationRaison;}
     if (entretienFile) {
       const reader = new FileReader();
       await new Promise<void>((resolve) => {
@@ -206,15 +218,39 @@ const AdminParcoursPage = () => {
         reader.readAsDataURL(entretienFile);
       });
     }
+    // Ajouter un commentaire automatique pour la reprogrammation
+if (selectedTask.dateEntretien && reprogrammationRaison) {
+  const raisonText = `🔄 Reprogrammation d'entretien\nRaison : ${reprogrammationRaison}\nNouvelle date : ${new Date(entretienDate).toLocaleString("fr-FR")}`;
+  commentMutation.mutate({
+    taskId: selectedTask.id,
+    data: {
+      auteurId: userId!,
+      auteurNom: "Admin RH",
+      texte: raisonText
+    }
+  });
+}
     entretienMutation.mutate({ taskId: selectedTask.id, data: docData });
   };
 
   // ── Filtres ───────────────────────────────────────────────────────
-  const usersWithParcours = (allUsers as any[]).filter(u =>
-    u.role !== "ADMIN" &&
-    (filterRole === "TOUS" || u.role === filterRole) &&
-    (searchQuery === "" || `${u.prenom} ${u.nom}`.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const usersWithParcours = (allUsers as any[]).filter(u => {
+
+  if (u.role === "ADMIN") return false;
+  const parcours = getParcoursForUser(u.id);
+  if (!parcours) return false;
+  // Filtre par rôle
+  if (filterRole !== "TOUS" && u.role !== filterRole) return false;
+  // Filtre par recherche
+  if (searchQuery) {
+    const fullName = `${u.prenom} ${u.nom}`.toLowerCase();
+    const email = u.email.toLowerCase();
+    const query = searchQuery.toLowerCase();
+    if (!fullName.includes(query) && !email.includes(query)) return false;
+  }
+  
+  return true;
+});
 
   const adminTasks = assignedTasks as Task[];
 
@@ -231,15 +267,16 @@ const AdminParcoursPage = () => {
             <div>
               <h1 className="text-xl font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>Suivi des parcours</h1>
               <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
-                {(allParcours as Parcours[]).length} parcours actifs ·{" "}
-                {adminTasks.filter(t => needsRhAction(t)).length} tâches RH à traiter
+               {usersWithParcours.length} parcours actifs ·{" "}
+               {validRHTasks.length} tâches RH à traiter
               </p>
             </div>
+            
           </div>
           <div className="flex items-center gap-1">
             {[
-              { key: "tous",   label: "Tous les parcours", count: (allParcours as Parcours[]).length },
-              { key: "taches", label: "Mes tâches RH",     count: adminTasks.filter(t => needsRhAction(t)).length },
+              { key: "tous",   label: "Tous les parcours", count: usersWithParcours.length},
+              { key: "taches", label: "Mes tâches RH",     count:  validRHTasks.length },
             ].map(tab => (
               <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key as any)}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition"
@@ -400,7 +437,7 @@ const AdminParcoursPage = () => {
                           <div className="mt-3">
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                                {parcoursData.tasks.filter(t => t.statut === "TERMINE").length}/{parcoursData.tasks.length} tâches
+                                {parcoursData.tasks.filter(t => rhIsActeur(t) && t.statut === "TERMINE").length}/{parcoursData.tasks.filter(t => rhIsActeur(t)).length} tâches RH
                               </span>
                               <span className="text-xs font-bold" style={{
                                 color: parcoursData.parcours.progression === 100 ? "#8DC63F" : "#00AEEF"
@@ -421,12 +458,20 @@ const AdminParcoursPage = () => {
                     })()}
                   </div>
                   <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                    {parcoursData.tasks.map((task) => {
+                    {parcoursData.tasks.filter(t => rhIsActeur(t)).length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
+                        <span className="text-3xl">🏢</span>
+                        <p className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
+                          Aucune tâche RH<br />dans ce parcours
+                        </p>
+                      </div>
+                    )}
+                    {parcoursData.tasks.filter(t => rhIsActeur(t)).map((task) => {
                       const typeConf   = TASK_TYPE_CONFIG[task.taskType];
                       const statutConf = STATUT_CONFIG[task.statut];
                       const isSelected = selectedTask?.id === task.id;
-                      const isLocked   = task.verrouille;
-                      // ✅ FIXED: uses typeActeurs (array)
+                      const isLocked   = role==="ADMIN"?false:task.verrouille;
+                    
                       const needsAdmin = needsRhAction(task);
 
                       return (
@@ -459,7 +504,7 @@ const AdminParcoursPage = () => {
                                   style={{ background: statutConf.bg, color: statutConf.color }}>
                                   {statutConf.label}
                                 </span>
-                                {/* ✅ FIXED: displays typeActeurs array */}
+                                
                                 {task.typeActeurs?.map(a => (
                                   <span key={a} className="text-xs" style={{ color: "var(--text-muted)" }}>
                                     {ACTEUR_LABELS[a]}
@@ -548,20 +593,40 @@ const AdminParcoursPage = () => {
                     );
                   })()}
 
-                  {/* Document salarié */}
-                  {selectedTask.taskType === "DOCUMENT_SALARIE" && selectedTask.documentNom && (
+                  {/* Tâche SIMPLE : document admin + document salarié */}
+                  {selectedTask.taskType === "SIMPLE" && (
                     <div className="card p-5 space-y-3">
-                      <p className="text-sm font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>
-                        📎 Document déposé par le salarié
-                      </p>
-                      <button type="button"
-                        onClick={() => selectedTask.documentContenu && openBase64(selectedTask.documentContenu, selectedTask.documentMimeType)}
-                        className="flex items-center gap-3 p-4 rounded-xl w-full text-left transition hover:scale-[1.01]"
-                        style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.2)", color: "#d97706" }}>
-                        <span className="text-2xl">📎</span>
-                        <span className="font-medium text-sm flex-1">{selectedTask.documentNom}</span>
-                        <span className="text-xs opacity-60">Consulter</span>
-                      </button>
+                      <p className="text-sm font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>✅ Tâche simple</p>
+                      {/* Document mis à disposition par l'admin */}
+                      {selectedTask.config?.documentNom && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold" style={{ color: "#059669" }}>📄 Document mis à disposition</p>
+                          <button type="button"
+                            onClick={() => selectedTask.config?.documentContenu && openBase64(selectedTask.config.documentContenu, selectedTask.config.documentMimeType)}
+                            className="flex items-center gap-3 p-3 rounded-xl w-full text-left transition hover:opacity-80"
+                            style={{ background: "rgba(5,150,105,0.06)", border: "1px solid rgba(5,150,105,0.2)" }}>
+                            <span className="text-xl">📄</span>
+                            <span className="font-medium text-sm flex-1" style={{ color: "var(--text)" }}>
+                              {selectedTask.config.documentNom}
+                            </span>
+                            <span className="text-xs opacity-60">Consulter</span>
+                          </button>
+                        </div>
+                      )}
+                      {/* Document déposé par le salarié */}
+                      {selectedTask.documentNom && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold" style={{ color: "#d97706" }}>📎 Document déposé par le salarié</p>
+                          <button type="button"
+                            onClick={() => selectedTask.documentContenu && openBase64(selectedTask.documentContenu, selectedTask.documentMimeType)}
+                            className="flex items-center gap-3 p-4 rounded-xl w-full text-left transition hover:scale-[1.01]"
+                            style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.2)", color: "#d97706" }}>
+                            <span className="text-2xl">📎</span>
+                            <span className="font-medium text-sm flex-1">{selectedTask.documentNom}</span>
+                            <span className="text-xs opacity-60">Consulter</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -576,9 +641,7 @@ const AdminParcoursPage = () => {
                           <div>
                             <p className="text-xs font-semibold" style={{ color: "#7c3aed" }}>Date planifiée</p>
                             <p className="text-sm font-bold" style={{ color: "var(--text)" }}>
-                              {new Date(selectedTask.dateEntretien).toLocaleDateString("fr-FR", {
-                                weekday: "long", day: "2-digit", month: "long", year: "numeric",
-                              })}
+                               {new Date(selectedTask.dateEntretien).toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                             </p>
                           </div>
                         </div>
@@ -629,7 +692,7 @@ const AdminParcoursPage = () => {
 
                   {/* ✅ FIXED: Actions RH — si typeActeurs includes "RH" */}
                   {rhIsActeur(selectedTask) && !rhProgressionDone(selectedTask) &&
-                   selectedTask.statut !== "TERMINE" && selectedTask.statut !== "REJETE" && (
+                   selectedTask.statut !== "TERMINE" && (
                     <div className="card p-5 space-y-3">
                       <p className="text-sm font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>
                         🏢 Action RH requise
@@ -645,9 +708,15 @@ const AdminParcoursPage = () => {
                         <button type="button" onClick={() => handleValidate(true)} className="btn-success flex-1 py-2.5">
                           ✅ Valider
                         </button>
-                        <button type="button" onClick={() => handleValidate(false)} className="btn-danger flex-1 py-2.5">
+                      {/* Mafammech ta3mel rejeter tache{selectedTask.taskType === "ENTRETIEN" && (
+                        <button
+                          type="button"
+                          onClick={() => handleValidate(false)}
+                          className="btn-danger flex-1 py-2.5"
+                        >
                           ❌ Rejeter
                         </button>
+                      )}*/}
                       </div>
                     </div>
                   )}
@@ -697,60 +766,93 @@ const AdminParcoursPage = () => {
           </div>
         )}
 
-        {/* ── Tab Mes tâches RH ── */}
-        {activeTab === "taches" && (
-          <div className="px-8 py-6">
-            {loadingAssigned ? (
-              <div className="flex items-center justify-center h-40">
-                <div className="w-8 h-8 border-4 rounded-full animate-spin"
-                  style={{ borderColor: "rgba(0,174,239,0.2)", borderTopColor: "#00AEEF" }} />
+       {/* ── Tab Mes tâches RH ── */}
+{activeTab === "taches" && (
+  <div className="px-8 py-6">
+    {loadingAssigned ? (
+      <div className="flex items-center justify-center h-40">
+        <div className="w-8 h-8 border-4 rounded-full animate-spin"
+          style={{ borderColor: "rgba(0,174,239,0.2)", borderTopColor: "#00AEEF" }} />
+      </div>
+    ) : adminTasks.filter(t => needsRhAction(t)).length === 0 ? (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <span className="text-6xl">✅</span>
+        <p className="text-lg font-semibold" style={{ color: "var(--text-muted)", fontFamily: "Sora" }}>
+          Aucune tâche en attente
+        </p>
+      </div>
+    ) : (
+      <div className="max-w-3xl space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--text-muted)" }}>
+            {validRHTasks.length} tâche(s) assignée(s) à l'équipe RH
+        </p>
+        {adminTasks.filter(t => needsRhAction(t)).map((task) => {
+          const typeConf   = TASK_TYPE_CONFIG[task.taskType];
+          const statutConf = STATUT_CONFIG[task.statut];
+          
+          // ✅ CORRECTION: Chercher le PARCOURS par son ID, pas l'utilisateur
+          const parcours = allParcours.find(p => p.id === task.parcoursId);
+          // ✅ Trouver l'utilisateur associé à ce parcours
+          const user = parcours ? getUserById(parcours.userId) : null;
+          
+          // ✅ Ignorer les tâches qui n'ont pas de parcours valide
+          if (!parcours || !user) {
+            console.warn("Tâche ignorée - parcours ou utilisateur non trouvé:", {
+              taskId: task.id,
+              taskTitre: task.titre,
+              parcoursId: task.parcoursId,
+              parcoursTrouve: !!parcours,
+              userTrouve: !!user
+            });
+            return null;
+          }
+          
+          return (
+            <div key={task.id} className="card p-5 flex items-center gap-4"
+              style={{ border: "1px solid rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.02)" }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                style={{ background: typeConf.bg }}>
+                {typeConf.icon}
               </div>
-            ) : adminTasks.filter(t => needsRhAction(t)).length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-4">
-                <span className="text-6xl">✅</span>
-                <p className="text-lg font-semibold" style={{ color: "var(--text-muted)", fontFamily: "Sora" }}>
-                  Aucune tâche en attente
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-sm" style={{ color: "var(--text)", fontFamily: "Sora" }}>
+                    {task.titre}
+                  </p>
+                  <span className="text-xs px-2 py-0.5 rounded-full"
+                    style={{ background: statutConf.bg, color: statutConf.color }}>
+                    {statutConf.label}
+                  </span>
+                </div>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  👤 {user.prenom} {user.nom}
                 </p>
+                {task.echeance && (
+                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                    ⏱ {new Date(task.echeance).toLocaleDateString("fr-FR")}
+                  </p>
+                )}
               </div>
-            ) : (
-              <div className="max-w-3xl space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--text-muted)" }}>
-                  {adminTasks.filter(t => needsRhAction(t)).length} tâche(s) assignée(s) à l'équipe RH
-                </p>
-                {adminTasks.filter(t => needsRhAction(t)).map((task) => {
-                  const typeConf   = TASK_TYPE_CONFIG[task.taskType];
-                  const statutConf = STATUT_CONFIG[task.statut];
-                  return (
-                    <div key={task.id} className="card p-5 flex items-center gap-4"
-                      style={{ border: "1px solid rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.02)" }}>
-                      <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-                        style={{ background: typeConf.bg }}>{typeConf.icon}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-sm" style={{ color: "var(--text)", fontFamily: "Sora" }}>{task.titre}</p>
-                          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: statutConf.bg, color: statutConf.color }}>
-                            {statutConf.label}
-                          </span>
-                        </div>
-                        {task.echeance && (
-                          <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                            ⏱ {new Date(task.echeance).toLocaleDateString("fr-FR")}
-                          </p>
-                        )}
-                      </div>
-                      <button type="button"
-                        onClick={() => { handleSelectUser(task.parcoursId); setSelectedTask(task); setActiveTab("tous"); }}
-                        className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition hover:scale-105"
-                        style={{ background: "rgba(0,174,239,0.1)", color: "#00AEEF", border: "1px solid rgba(0,174,239,0.2)" }}>
-                        Traiter →
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+              <button
+                type="button"
+                onClick={() => {
+                  handleSelectUser(user.id);
+                  setTimeout(() => {
+                    setSelectedTask(task);
+                    setActiveTab("tous");
+                  }, 500);
+                }}
+                className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition hover:scale-105"
+                style={{ background: "rgba(0,174,239,0.1)", color: "#00AEEF", border: "1px solid rgba(0,174,239,0.2)" }}>
+                Traiter →
+              </button>
+            </div>
+          );
+        }).filter(Boolean)} {/* Filtrer les null */}
+      </div>
+    )}
+  </div>
+)}
       </main>
 
       {/* ── Modal Validation ── */}
@@ -761,7 +863,7 @@ const AdminParcoursPage = () => {
             style={{ background: "var(--surface)", maxWidth: "460px", zIndex: 51 }}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>
-                {validateApprouve ? "✅ Valider la tâche" : "❌ Rejeter la tâche"}
+                  ✅ Valider la tâche
               </h3>
               <button type="button" onClick={() => setShowValidateModal(false)}
                 className="w-9 h-9 rounded-full flex items-center justify-center"
@@ -816,6 +918,30 @@ const AdminParcoursPage = () => {
                 <input type="datetime-local" value={entretienDate} onChange={(e) => setEntretienDate(e.target.value)}
                   className="input-field" min={new Date().toISOString().slice(0, 16)} />
               </div>
+                {/* 🔥 LE CHAMP RAISON 🔥 */}
+        {selectedTask?.dateEntretien && (
+          <div>
+            <label className="block text-xs font-bold mb-2" style={{ color: "var(--text-muted)" }}>
+              Raison de la reprogrammation *
+            </label>
+            <input 
+              type="text" 
+              value={reprogrammationRaison}
+              onChange={(e) => setReprogrammationRaison(e.target.value)}
+              placeholder="Ex: Document incomplet, Absence du salarié..."
+              className="input-field text-sm"
+            />
+          </div>
+        )}
+
+        {/* Message d'information pour reprogrammation */}
+        {selectedTask?.dateEntretien && (
+          <div className="p-3 rounded-xl text-xs"
+            style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", color: "#f59e0b" }}>
+            ⚠️ L'ancienne date ({new Date(selectedTask.dateEntretien).toLocaleDateString("fr-FR")}) 
+            sera remplacée
+          </div>
+        )}
               <div>
                 <label className="block text-xs font-bold mb-2 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
                   Document de préparation (optionnel)

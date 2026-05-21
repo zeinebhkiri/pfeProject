@@ -71,6 +71,13 @@ const DocumentsSection = ({ documents, disabled }: Props) => {
       setUploadError("Veuillez remplir tous les champs.");
       return;
     }
+    const isAlreadyUploaded = documents.some(doc => doc.type === docType);
+  
+  if (isAlreadyUploaded) {
+    const docLabel = TYPES_DOCUMENTS.find(t => t.value === docType)?.label;
+    setUploadError(`❌ Un document de type "${docLabel}" a déjà été téléchargé. Veuillez le supprimer avant d'en ajouter un nouveau.`);
+    return;
+  }
     if (docFile.size > 5 * 1024 * 1024) {
       setUploadError("Fichier trop volumineux (max 5MB).");
       return;

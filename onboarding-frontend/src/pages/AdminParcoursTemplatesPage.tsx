@@ -28,8 +28,6 @@ import { useAuth } from "../hooks/useAuth";
 const TASK_TYPE_CONFIG: Record<TaskType, { label: string; icon: string; color: string; bg: string }> = {
   FORMATION:        { label: "Formation",         icon: "🎓", color: "#00AEEF", bg: "rgba(0,174,239,0.08)"   },
   QUIZ:             { label: "Quiz",              icon: "🧠", color: "#8DC63F", bg: "rgba(141,198,63,0.08)"  },
-  DOCUMENT_RH:      { label: "Document RH",       icon: "📄", color: "#1A2B6B", bg: "rgba(26,43,107,0.08)"  },
-  DOCUMENT_SALARIE: { label: "Document Salarié",  icon: "📎", color: "#d97706", bg: "rgba(217,119,6,0.08)"  },
   ENTRETIEN:        { label: "Entretien",         icon: "🤝", color: "#7c3aed", bg: "rgba(124,58,237,0.08)" },
   SIMPLE:           { label: "Tâche simple",      icon: "✅", color: "#059669", bg: "rgba(5,150,105,0.08)"  },
 };
@@ -83,6 +81,9 @@ const AdminParcoursTemplatesPage = () => {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
+  // Recherche
+const [searchTerm, setSearchTerm] = useState("");
+
   // ── Queries ───────────────────────────────────────────────────────
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
     queryKey: ["parcoursTemplates"],
@@ -99,6 +100,7 @@ const AdminParcoursTemplatesPage = () => {
     queryFn: () => getTaskTemplatesApi(selectedTemplate!.id),
     enabled: !!selectedTemplate?.id,
   });
+
 
   // ── Mutations Templates ───────────────────────────────────────────
   const createTemplateMutation = useMutation({
@@ -129,7 +131,7 @@ const AdminParcoursTemplatesPage = () => {
       queryClient.invalidateQueries({ queryKey: ["parcoursTemplates"] });
       if (selectedTemplate?.id === deleteConfirmId) setSelectedTemplate(null);
       setDeleteConfirmId(null);
-      setSuccessMsg("Template supprimé !");
+      setSuccessMsg("Template archivé !");
     },
   });
 
@@ -177,6 +179,7 @@ const AdminParcoursTemplatesPage = () => {
   if (!typeActeurs || typeActeurs.length === 0) return "Aucun acteur";
   return typeActeurs.map(a => `${ACTEUR_CONFIG[a]?.icon} ${ACTEUR_CONFIG[a]?.label}`).join(" / ");
 };
+
 
   // ── Helpers modals ────────────────────────────────────────────────
   const openCreateTemplate = () => {
@@ -333,6 +336,10 @@ const AdminParcoursTemplatesPage = () => {
   // ── Résoudre le titre du poste ────────────────────────────────────
   const getPositionTitre = (positionId: string) =>
     (positions as Position[]).find(p => p.id === positionId)?.titre ?? positionId;
+  // Filtrer les templates par recherche
+const filteredTemplates = (templates as ParcoursTemplate[]).filter(template =>
+  template.titre.toLowerCase().includes(searchTerm.toLowerCase())
+);
 
   // ── Render ────────────────────────────────────────────────────────
   return (
@@ -351,12 +358,18 @@ const AdminParcoursTemplatesPage = () => {
             <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
               Configurez les templates de parcours par poste
             </p>
+            <a
+              href="/admin/archives/parcours-templates"
+             className="text-sm text-[#00AEEF] hover:underline flex items-center gap-1"
+            >
+              🗂️ Voir les modèles archivés →
+            </a>
           </div>
           <button type="button" onClick={openCreateTemplate} className="btn-primary flex items-center gap-2 px-5 py-2.5">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            Nouveau parcours
+            Nouveau modèle de parcours 
           </button>
         </div>
 
@@ -381,77 +394,117 @@ const AdminParcoursTemplatesPage = () => {
         <div className="px-8 py-6 flex gap-6 items-start">
 
           {/* ── Colonne gauche — Liste templates ── */}
-          <div className="w-80 flex-shrink-0 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-widest px-1"
-              style={{ color: "var(--text-muted)" }}>
-              {(templates as ParcoursTemplate[]).length} parcours configurés
-            </p>
+     <div className="w-80 flex-shrink-0 space-y-3">
+  {/* Barre de recherche */}
+  <div className="relative">
+    <input
+      type="text"
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+      placeholder="   Rechercher un parcours..."
+      className="input-field pl-9"
+      style={{ background: "var(--surface)", fontSize: "13px" }}
+    />
+    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-40"
+      style={{ color: "var(--text-muted)" }}
+      viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="11" cy="11" r="8"/>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    {searchTerm && (
+      <button
+        type="button"
+        onClick={() => setSearchTerm("")}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs opacity-60 hover:opacity-100 transition"
+        style={{ color: "var(--text-muted)" }}
+      >
+        ✕
+      </button>
+    )}
+  </div>
 
-            {loadingTemplates ? (
-              <div className="flex items-center justify-center h-32">
-                <div className="w-6 h-6 border-4 rounded-full animate-spin"
-                  style={{ borderColor: "rgba(0,174,239,0.2)", borderTopColor: "#00AEEF" }} />
-              </div>
-            ) : (templates as ParcoursTemplate[]).length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-3 rounded-2xl"
-                style={{ border: "2px dashed var(--border)" }}>
-                <span className="text-4xl">🗂</span>
-                <p className="text-sm text-center" style={{ color: "var(--text-muted)" }}>
-                  Aucun parcours.<br />Créez le premier.
-                </p>
-              </div>
-            ) : (
-              (templates as ParcoursTemplate[]).map(t => (
-                <div key={t.id}
-                  onClick={() => setSelectedTemplate(t)}
-                  className="card p-4 cursor-pointer transition hover:shadow-md"
-                  style={{
-                    border: selectedTemplate?.id === t.id
-                      ? "2px solid #00AEEF"
-                      : "1px solid var(--border)",
-                    background: selectedTemplate?.id === t.id
-                      ? "rgba(0,174,239,0.04)"
-                      : "var(--surface)",
-                  }}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm truncate" style={{ color: "var(--text)", fontFamily: "Sora" }}>
-                        {t.titre}
-                      </p>
-                      <p className="text-xs mt-1 truncate" style={{ color: "#00AEEF" }}>
-                        💼 {getPositionTitre(t.positionId)}
-                      </p>
-                      {t.description && (
-                        <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--text-muted)" }}>
-                          {t.description}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex gap-1 flex-shrink-0">
-                      <button type="button"
-                        onClick={(e) => { e.stopPropagation(); openEditTemplate(t); }}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center hover:scale-110 transition"
-                        style={{ background: "rgba(0,174,239,0.1)", color: "#00AEEF" }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                      </button>
-                      <button type="button"
-                        onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(t.id); }}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center hover:scale-110 transition"
-                        style={{ background: "#fef2f2", color: "#dc2626" }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="3 6 5 6 21 6"/>
-                          <path d="M19 6l-1 14H6L5 6"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))
+  <p className="text-xs font-semibold uppercase tracking-widest px-1"
+    style={{ color: "var(--text-muted)" }}>
+    {filteredTemplates.length} / {(templates as ParcoursTemplate[]).length} parcours configurés
+  </p>
+
+  {loadingTemplates ? (
+    <div className="flex items-center justify-center h-32">
+      <div className="w-6 h-6 border-4 rounded-full animate-spin"
+        style={{ borderColor: "rgba(0,174,239,0.2)", borderTopColor: "#00AEEF" }} />
+    </div>
+  ) : filteredTemplates.length === 0 ? (
+    <div className="flex flex-col items-center justify-center py-12 gap-3 rounded-2xl"
+      style={{ border: "2px dashed var(--border)" }}>
+      <span className="text-4xl">🔍</span>
+      <p className="text-sm text-center" style={{ color: "var(--text-muted)" }}>
+        {searchTerm 
+          ? `Aucun parcours ne correspond à "${searchTerm}"`
+          : "Aucun parcours. Créez le premier."}
+      </p>
+      {searchTerm && (
+        <button
+          type="button"
+          onClick={() => setSearchTerm("")}
+          className="text-xs underline transition hover:opacity-80"
+          style={{ color: "#00AEEF" }}
+        >
+          Effacer la recherche
+        </button>
+      )}
+    </div>
+  ) : (
+    filteredTemplates.map(t => (
+      <div key={t.id}
+        onClick={() => setSelectedTemplate(t)}
+        className="card p-4 cursor-pointer transition hover:shadow-md"
+        style={{
+          border: selectedTemplate?.id === t.id
+            ? "2px solid #00AEEF"
+            : "1px solid var(--border)",
+          background: selectedTemplate?.id === t.id
+            ? "rgba(0,174,239,0.04)"
+            : "var(--surface)",
+        }}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm truncate" style={{ color: "var(--text)", fontFamily: "Sora" }}>
+              {t.titre}
+            </p>
+            <p className="text-xs mt-1 truncate" style={{ color: "#00AEEF" }}>
+              💼 {getPositionTitre(t.positionId)}
+            </p>
+            {t.description && (
+              <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--text-muted)" }}>
+                {t.description}
+              </p>
             )}
           </div>
+          <div className="flex gap-1 flex-shrink-0">
+            <button type="button"
+              onClick={(e) => { e.stopPropagation(); openEditTemplate(t); }}
+              className="w-7 h-7 rounded-lg flex items-center justify-center hover:scale-110 transition"
+              style={{ background: "rgba(0,174,239,0.1)", color: "#00AEEF" }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+            <button type="button"
+              onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(t.id); }}
+              className="w-7 h-7 rounded-lg flex items-center justify-center hover:scale-110 transition"
+              style={{ background: "#fef2f2", color: "#dc2626" }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14H6L5 6"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    ))
+  )}
+</div>
 
           {/* ── Colonne droite — Tâches du template sélectionné ── */}
           <div className="flex-1 min-w-0">
@@ -579,12 +632,6 @@ const AdminParcoursTemplatesPage = () => {
                               <p className="font-semibold text-sm" style={{ color: "var(--text)", fontFamily: "Sora" }}>
                                 {task.titre}
                               </p>
-                              {task.obligatoire && (
-                                <span className="text-xs px-1.5 py-0.5 rounded-full"
-                                  style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
-                                  Obligatoire
-                                </span>
-                              )}
                               {isEntretien && (
                                 <span className="text-xs px-1.5 py-0.5 rounded-full"
                                   style={{ background: "#faf5ff", color: "#7c3aed", border: "1px solid #e9d5ff" }}>
@@ -895,17 +942,6 @@ const AdminParcoursTemplatesPage = () => {
                     onChange={(e) => setTaskForm(p => ({ ...p, delaiJours: parseInt(e.target.value) || 0 }))}
                     className="input-field" />
                 </div>
-                <div className="flex items-center">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <div className={`relative w-11 h-6 rounded-full transition-all ${taskForm.obligatoire ? "bg-cyan-500" : "bg-gray-300"}`}
-                      onClick={() => setTaskForm(p => ({ ...p, obligatoire: !p.obligatoire }))}>
-                      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${taskForm.obligatoire ? "left-5" : "left-0.5"}`} />
-                    </div>
-                    <span className="text-sm font-medium" style={{ color: "var(--text)" }}>
-                      Tâche obligatoire
-                    </span>
-                  </label>
-                </div>
               </div>
 
               {/* ── Config selon le type ── */}
@@ -942,6 +978,11 @@ const AdminParcoursTemplatesPage = () => {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (!file) return;
+                            // ✅ AJOUT ICI
+  if (file.size > 3 * 1024 * 1024) {
+    setErrorMsg("Fichier trop lourd (max 3MB)");
+    return;
+  }
                           const reader = new FileReader();
                           reader.onloadend = () => {
                             const base64 = (reader.result as string).split(",")[1];
@@ -1024,59 +1065,86 @@ const AdminParcoursTemplatesPage = () => {
                 </div>
               )}
 
-              {/* DOCUMENT_RH */}
-              {taskForm.taskType === "DOCUMENT_RH" && (
+              {/* SIMPLE — pièce jointe optionnelle */}
+              {taskForm.taskType === "SIMPLE" && (
                 <div className="rounded-2xl p-5 space-y-4"
-                  style={{ background: "rgba(26,43,107,0.04)", border: "1px solid rgba(26,43,107,0.15)" }}>
-                  <p className="text-sm font-bold" style={{ color: "#1A2B6B" }}>📄 Document à consulter (RH dépose)</p>
-                  <label className="flex items-center justify-center gap-3 w-full py-4 rounded-xl cursor-pointer"
-                    style={{ background: "var(--bg)", border: "2px dashed var(--border)" }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A2B6B" strokeWidth="2">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="17 8 12 3 7 8"/>
-                      <line x1="12" y1="3" x2="12" y2="15"/>
-                    </svg>
-                    <span className="text-sm font-medium" style={{ color: "#1A2B6B" }}>
-                      {taskForm.config?.documentNom || "Choisir le document à mettre à disposition"}
-                    </span>
-                    <input type="file" accept=".pdf,.doc,.docx,.jpg,.png"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          const base64 = (reader.result as string).split(",")[1];
-                          updateConfig("documentContenu", base64);
-                          updateConfig("documentNom", file.name);
-                          updateConfig("documentMimeType", file.type);
-                        };
-                        reader.readAsDataURL(file);
-                      }}
-                      className="hidden" />
-                  </label>
-                  {taskForm.config?.documentNom && (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm"
-                      style={{ background: "rgba(26,43,107,0.06)", color: "#1A2B6B" }}>
-                      📎 {taskForm.config.documentNom}
-                    </div>
-                  )}
-                </div>
-              )}
+                  style={{ background: "rgba(5,150,105,0.04)", border: "1px solid rgba(5,150,105,0.15)" }}>
+                  <p className="text-sm font-bold" style={{ color: "#059669" }}>✅ Options de la tâche simple</p>
 
-              {/* DOCUMENT_SALARIE */}
-              {taskForm.taskType === "DOCUMENT_SALARIE" && (
-                <div className="rounded-2xl p-5"
-                  style={{ background: "rgba(217,119,6,0.04)", border: "1px solid rgba(217,119,6,0.15)" }}>
-                  <p className="text-sm font-bold mb-3" style={{ color: "#d97706" }}>📎 Document à déposer (Salarié)</p>
+                  {/* Date planifiée */}
                   <div>
                     <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                      Type de document attendu
+                      Date planifiée (optionnel)
+                    </label>
+                    <input type="date"
+                      value={taskForm.config?.datePlanifiee || ""}
+                      onChange={(e) => updateConfig("datePlanifiee", e.target.value)}
+                      className="input-field" />
+                  </div>
+
+                  {/* Document mis à disposition par l'admin (lu par salarié/manager) */}
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                      Document à mettre à disposition (optionnel)
+                    </label>
+                    <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+                      Ce document sera visible par le salarié et le manager dans la tâche (ex : consigne, formulaire, guide…)
+                    </p>
+                    <label className="flex items-center justify-center gap-3 w-full py-4 rounded-xl cursor-pointer transition hover:opacity-80"
+                      style={{ background: "var(--bg)", border: "2px dashed var(--border)" }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                      </svg>
+                      <span className="text-sm font-medium" style={{ color: "#059669" }}>
+                        {taskForm.config?.documentNom || "Choisir un fichier (PDF, image, Word…)"}
+                      </span>
+                      <input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            const base64 = (reader.result as string).split(",")[1];
+                            updateConfig("documentContenu", base64);
+                            updateConfig("documentNom", file.name);
+                            updateConfig("documentMimeType", file.type);
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                        className="hidden" />
+                    </label>
+                    {taskForm.config?.documentNom && (
+                      <div className="flex items-center justify-between gap-2 px-3 py-2 mt-2 rounded-xl text-sm"
+                        style={{ background: "rgba(5,150,105,0.08)", border: "1px solid rgba(5,150,105,0.2)", color: "#059669" }}>
+                        <span>📎 {taskForm.config.documentNom}</span>
+                        <button type="button"
+                          onClick={() => {
+                            updateConfig("documentContenu", undefined);
+                            updateConfig("documentNom", undefined);
+                            updateConfig("documentMimeType", undefined);
+                          }}
+                          className="text-xs opacity-60 hover:opacity-100 transition">
+                          ✕ Retirer
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Document à joindre par le salarié */}
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                      Document à joindre par le salarié (optionnel)
                     </label>
                     <input type="text"
                       value={taskForm.config?.typeDocumentAttendu || ""}
                       onChange={(e) => updateConfig("typeDocumentAttendu", e.target.value)}
-                      placeholder="Ex: Contrat signé, Copie CIN, RIB..."
+                      placeholder="Ex: Contrat signé, attestation de formation..."
                       className="input-field" />
+                    <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                      Si renseigné, le salarié pourra joindre un document pour compléter la tâche.
+                    </p>
                   </div>
                 </div>
               )}
@@ -1130,23 +1198,7 @@ const AdminParcoursTemplatesPage = () => {
               )}
 
               {/* SIMPLE */}
-              {taskForm.taskType === "SIMPLE" && (
-                <div className="rounded-2xl p-5"
-                  style={{ background: "rgba(5,150,105,0.04)", border: "1px solid rgba(5,150,105,0.15)" }}>
-                  <p className="text-sm font-bold mb-3" style={{ color: "#059669" }}>✅ Tâche simple</p>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                      Date planifiée (optionnel)
-                    </label>
-                    <input type="date"
-                      value={taskForm.config?.datePlanifiee || ""}
-                      onChange={(e) => updateConfig("datePlanifiee", e.target.value)}
-                      className="input-field" />
-                  </div>
-                </div>
-              )}
-
-              {errorMsg && (
+                            {errorMsg && (
                 <div className="px-4 py-3 rounded-xl text-xs"
                   style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
                   ⚠ {errorMsg}
@@ -1183,7 +1235,7 @@ const AdminParcoursTemplatesPage = () => {
               <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"
                 style={{ background: "#fef2f2" }}>🗑</div>
               <h3 className="text-lg font-bold mb-2" style={{ color: "var(--text)", fontFamily: "Sora" }}>
-                Supprimer ce parcours ?
+               Désactiver ce parcours  ?
               </h3>
               <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
                 Toutes les tâches associées seront supprimées. Les parcours déjà générés ne seront pas affectés.

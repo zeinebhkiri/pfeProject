@@ -45,7 +45,7 @@ public class ParcoursService {
         Parcours parcours = new Parcours();
         parcours.setUserId(userId);
         parcours.setPositionId(positionId);
-        parcours.setParcoursTemplateId(template.getId());
+        //parcours.setParcoursTemplateId(template.getId());
         parcours.setStatut(Parcours.StatutParcours.EN_COURS);
         parcours.setDateDebut(LocalDateTime.now());
         parcours.setProgression(0);
@@ -58,7 +58,7 @@ public class ParcoursService {
         for (TaskTemplate tt : taskTemplates) {
             Task task = new Task();
             task.setParcoursId(saved.getId());
-            task.setTaskTemplateId(tt.getId());
+            //task.setTaskTemplateId(tt.getId());
             task.setTitre(tt.getTitre());
             task.setDescription(tt.getDescription());
             task.setTaskType(tt.getTaskType());
@@ -78,7 +78,7 @@ public class ParcoursService {
             for (TypeActeur acteur : tt.getTypeActeurs()) {
                 if (acteur == TypeActeur.MANAGER) acteurIds.add(managerId);
                 else if (acteur == TypeActeur.SALARIE) acteurIds.add(userId);
-                // RH → null, any admin handles it
+
             }
             task.setActeurIds(acteurIds);
 
@@ -119,7 +119,7 @@ public class ParcoursService {
                 task.setEcheance(refDate.plusDays(tt.getDelaiJours()).atStartOfDay());
             }
             if (tt.getDelaiJours() < 0) {
-                task.setEcheance(refDate.minusDays(tt.getDelaiJours()).atStartOfDay());
+                task.setEcheance(refDate.minusDays(Math.abs(tt.getDelaiJours())).atStartOfDay());
             }
 
             // Verrouiller l'entretien par défaut (priorité sur la logique ci-dessus)

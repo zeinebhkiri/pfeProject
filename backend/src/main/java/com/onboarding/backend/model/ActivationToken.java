@@ -14,7 +14,6 @@ public class ActivationToken {
 
     @Id
     private String id;
-
     private String token;
     private String userId;
     private LocalDateTime expirationDate;

@@ -1,10 +1,12 @@
 package com.onboarding.backend.controller;
 
 import com.onboarding.backend.model.Affectation;
+import com.onboarding.backend.model.Parcours;
 import com.onboarding.backend.model.Position;
 import com.onboarding.backend.model.User;
 import com.onboarding.backend.model.enums.StatutCompte;
 import com.onboarding.backend.repository.AffectationRepository;
+import com.onboarding.backend.repository.ParcoursRepository;
 import com.onboarding.backend.repository.PositionRepository;
 import com.onboarding.backend.repository.UserRepository;
 import com.onboarding.backend.service.EmailService;
@@ -13,12 +15,13 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
-
+import java.util.Optional;
 @RestController
 @RequestMapping("/api/affectations")
 @RequiredArgsConstructor
@@ -29,8 +32,10 @@ public class AffectationController {
     private final PositionRepository positionRepository;
     private final EmailService emailService;
     private final ParcoursService parcoursService;
+    private final ParcoursRepository parcoursRepository;
     // ── Créer ou modifier une affectation ───────────────────────────────────
     @PostMapping
+    @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createAffectation(@RequestBody AffectationRequest request) {
 
@@ -56,7 +61,7 @@ public class AffectationController {
         affectation.setUserId(request.getUserId());
         affectation.setPositionId(request.getPositionId());
         affectation.setManagerId(request.getManagerId());
-        affectation.setDateAffectation(LocalDateTime.now());
+        //affectation.setDateAffectation(LocalDateTime.now());
         if (request.getDatePriseDePoste() != null && !request.getDatePriseDePoste().isBlank()) {
             if (user.getProfessionalInfo() == null)
                 user.setProfessionalInfo(new User.ProfessionalInfo());
@@ -117,7 +122,7 @@ public class AffectationController {
 
     // ── Récupérer toutes les affectations ───────────────────────────────────
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('SALARIE')")
     public ResponseEntity<?> getAllAffectations() {
         return ResponseEntity.ok(affectationRepository.findAll());
     }
@@ -126,7 +131,7 @@ public class AffectationController {
     @Data
     public static class AffectationRequest {
         private String userId;
-        private String positionId;  // ← remplace poste
+        private String positionId;
         private String managerId;
         private String datePriseDePoste;
     }

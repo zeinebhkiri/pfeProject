@@ -7,6 +7,10 @@ import {
   addCommentTaskApi,
   planifierEntretienApi,
   completeTaskApi,
+  getCurrentUserApi,
+  unlockQuizApi
+  
+
 } from "../api/authApi";
 import { useAuth } from "../hooks/useAuth";
 import Sidebar from "../components/Sidebar";
@@ -16,8 +20,6 @@ import { type Task, type TaskType, type User, type Parcours, type StatutTask } f
 const TASK_TYPE_CONFIG: Record<TaskType, { label: string; icon: string; color: string; bg: string }> = {
   FORMATION:        { label: "Formation",        icon: "🎓", color: "#00AEEF", bg: "rgba(0,174,239,0.08)"   },
   QUIZ:             { label: "Quiz",             icon: "🧠", color: "#8DC63F", bg: "rgba(141,198,63,0.08)"  },
-  DOCUMENT_RH:      { label: "Document RH",      icon: "📄", color: "#1A2B6B", bg: "rgba(26,43,107,0.08)"  },
-  DOCUMENT_SALARIE: { label: "Document Salarié", icon: "📎", color: "#d97706", bg: "rgba(217,119,6,0.08)"  },
   ENTRETIEN:        { label: "Entretien",        icon: "🤝", color: "#7c3aed", bg: "rgba(124,58,237,0.08)" },
   SIMPLE:           { label: "Tâche simple",     icon: "✅", color: "#059669", bg: "rgba(5,150,105,0.08)"  },
 };
@@ -26,7 +28,6 @@ const STATUT_CONFIG = {
   NON_COMMENCE: { label: "À faire",  color: "#94a3b8", bg: "#f1f5f9" },
   EN_COURS:     { label: "En cours", color: "#2563eb", bg: "#eff6ff" },
   TERMINE:      { label: "Terminé",  color: "#059669", bg: "#ecfdf5" },
-  REJETE:       { label: "Rejeté",   color: "#dc2626", bg: "#fef2f2" },
 };
 
 const ACTEUR_LABELS: Record<string, string> = {
@@ -86,6 +87,14 @@ const ManagerParcoursPage = () => {
   const [entretienDate, setEntretienDate]           = useState("");
   const [entretienFile, setEntretienFile]           = useState<File | null>(null);
   const [entretienDocPreview, setEntretienDocPreview] = useState<string | null>(null);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [unlockTaskId, setUnlockTaskId] = useState<string | null>(null);
+  const [unlockComment, setUnlockComment] = useState("");
+  const [reprogrammationRaison, setReprogrammationRaison] = useState("");
+//ken famma correction ta3 document lezma
+ const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+const [correctionReason, setCorrectionReason] = useState("");
+const [correctionTaskId, setCorrectionTaskId] = useState<string | null>(null);
 
   const [commentText, setCommentText] = useState("");
   const [successMsg, setSuccessMsg]   = useState("");
@@ -105,11 +114,11 @@ const ManagerParcoursPage = () => {
 
   /** Une action manager est-elle requise sur cette tâche ? */
   const needsManagerAction = (task: Task): boolean => {
-    if (task.statut === "TERMINE" || task.statut === "REJETE") return false;
+    if (task.statut === "TERMINE") return false;
     if (!managerIsActeur(task)) return false;
     if (managerProgressionDone(task)) return false;
-    // Pour DOCUMENT_SALARIE : seulement si le salarié a déjà déposé
-    if (task.taskType === "DOCUMENT_SALARIE" && !task.documentNom) return false;
+    // Pour une tâche SIMPLE avec document : seulement si le salarié a déjà déposé
+    if (task.taskType === "SIMPLE" && task.config?.typeDocumentAttendu && !task.documentNom) return false;
     return true;
   };
 
@@ -120,6 +129,10 @@ const ManagerParcoursPage = () => {
   });
 
   const teamList = teamData as TeamMember[];
+  const { data: currentUser } = useQuery({
+  queryKey: ["currentUser"],
+  queryFn: getCurrentUserApi,
+});
 
   // ── Mutations ─────────────────────────────────────────────────────
   const validateMutation = useMutation({
@@ -191,6 +204,36 @@ const ManagerParcoursPage = () => {
       }
     },
   });
+const unlockQuizMutation = useMutation({
+  mutationFn: ({ taskId, commentaire, auteurNom }: { taskId: string; commentaire?: string; auteurNom?: string }) =>
+    unlockQuizApi(taskId, { commentaire, auteurId: userId!, auteurNom }),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["teamParcours"] });
+    queryClient.invalidateQueries({ queryKey: ["allParcours"] });
+    queryClient.invalidateQueries({ queryKey: ["assignedTasks"] });
+    setSuccessMsg("🔓 Quiz débloqué avec succès !");
+    setShowUnlockModal(false);
+    setUnlockTaskId(null);
+    setUnlockComment("");
+  },
+  onError: (e: any) => setErrorMsg(e.response?.data?.error || "Erreur déblocage."),
+});
+
+const handleUnlockQuiz = (taskId: string) => {
+  setUnlockTaskId(taskId);
+  setUnlockComment("");
+  setShowUnlockModal(true);
+};
+
+const confirmUnlockQuiz = () => {
+  if (unlockTaskId) {
+    const fullName = currentUser
+      ? `Manager : ${currentUser.prenom || ""} ${currentUser.nom || ""}`.trim()
+      : "Manager";
+    unlockQuizMutation.mutate({ taskId: unlockTaskId, commentaire: unlockComment, auteurNom: fullName });
+  }
+};
+
 
   // ── Handlers ──────────────────────────────────────────────────────
   const handleValidate = (approuve: boolean) => {
@@ -207,24 +250,73 @@ const ManagerParcoursPage = () => {
     });
   };
 
-  const handlePlanifierEntretien = async () => {
-    if (!selectedTask || !entretienDate) { setErrorMsg("La date est obligatoire."); return; }
-    let docData: any = { dateEntretien: entretienDate };
-    if (entretienFile) {
-      const reader = new FileReader();
-      await new Promise<void>((resolve) => {
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(",")[1];
-          docData.documentContenu = base64;
-          docData.documentNom = entretienFile.name;
-          docData.documentMimeType = entretienFile.type;
-          resolve();
-        };
-        reader.readAsDataURL(entretienFile);
-      });
+ const handlePlanifierEntretien = async () => {
+  if (!selectedTask || !entretienDate) { 
+    setErrorMsg("La date est obligatoire."); 
+    return; 
+  }
+  
+  let docData: any = { dateEntretien: entretienDate };
+  
+  if (selectedTask.dateEntretien && reprogrammationRaison) {
+    docData.commentaire = reprogrammationRaison;
+  }
+  
+  if (entretienFile) {
+    const reader = new FileReader();
+    await new Promise<void>((resolve) => {
+      reader.onloadend = () => {
+        const base64 = (reader.result as string).split(",")[1];
+        docData.documentContenu = base64;
+        docData.documentNom = entretienFile.name;
+        docData.documentMimeType = entretienFile.type;
+        resolve();
+      };
+      reader.readAsDataURL(entretienFile);
+    });
+  }
+  
+  // ✅ AJOUTER LE COMMENTAIRE AVANT LA MUTATION (pas après)
+  if (selectedTask.dateEntretien && reprogrammationRaison && currentUser) {
+    const raisonText = `🔄 **Reprogrammation d'entretien**\nRaison : ${reprogrammationRaison}\nNouvelle date : ${new Date(entretienDate).toLocaleString("fr-FR")}`;
+    const fullName = `Manager : ${currentUser.prenom || ""} ${currentUser.nom || ""}`.trim();
+    
+    // 🔥 Attendre que le commentaire soit ajouté AVANT de planifier
+    await commentMutation.mutateAsync({
+      taskId: selectedTask.id,
+      data: {
+        auteurId: userId!,
+        auteurNom: fullName,
+        texte: raisonText
+      }
+    });
+  }
+  
+  // ✅ UN SEUL APPEL à entretienMutation
+  entretienMutation.mutate({ taskId: selectedTask.id, data: docData });
+};
+  const handleDemanderCorrection = () => {
+  if (!correctionReason.trim()) {
+    setErrorMsg("Veuillez expliquer la correction demandée.");
+    return;
+  }
+  
+  const fullName = `Manager : ${currentUser?.prenom || ""} ${currentUser?.nom || ""}`.trim();
+  
+  commentMutation.mutate({
+    taskId: correctionTaskId!,
+    data: {
+      auteurId: userId!,
+      auteurNom: fullName,
+      texte: `📝 **Correction demandée** : ${correctionReason}`
     }
-    entretienMutation.mutate({ taskId: selectedTask.id, data: docData });
-  };
+  });
+  
+  setShowCorrectionModal(false);
+  setCorrectionReason("");
+  setCorrectionTaskId(null);
+  setSuccessMsg("✅ Correction demandée. Le salarié en a été informé.");
+};
 
   // ── Tâches en attente d'action manager ────────────────────────────
   const tasksPendingAction = teamList.flatMap(m =>
@@ -563,34 +655,66 @@ const ManagerParcoursPage = () => {
                           );
                         })()}
 
-                        {/* Document déposé par salarié */}
-                        {selectedTask.taskType === "DOCUMENT_SALARIE" && selectedTask.documentNom && (
+                        {/* Tâche SIMPLE : document admin + document salarié */}
+                        {selectedTask.taskType === "SIMPLE" && (
                           <div className="card p-5 space-y-3">
                             <p className="text-sm font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>
-                              📎 Document déposé par {selectedMember.salarie?.prenom}
+                              ✅ Tâche simple
                             </p>
-                            <button type="button"
-                              onClick={() => selectedTask.documentContenu && openBase64(selectedTask.documentContenu, selectedTask.documentMimeType)}
-                              className="flex items-center gap-3 p-4 rounded-xl w-full text-left transition hover:scale-[1.01]"
-                              style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.2)", color: "#d97706" }}>
-                              <span className="text-2xl">📎</span>
-                              <span className="font-medium text-sm flex-1">{selectedTask.documentNom}</span>
-                              <span className="text-xs opacity-60">Consulter</span>
-                            </button>
-                            {needsManagerAction(selectedTask) && (
-                              <div className="flex gap-3">
-                                <button type="button" onClick={() => handleValidate(true)} className="btn-success flex-1 py-2.5">
-                                  ✅ Valider le document
-                                </button>
-                                <button type="button" onClick={() => handleValidate(false)} className="btn-danger flex-1 py-2.5">
-                                  ❌ Rejeter
+                            {/* Document mis à disposition par l'admin */}
+                            {selectedTask.config?.documentNom && (
+                              <div className="space-y-2">
+                                <p className="text-xs font-semibold" style={{ color: "#059669" }}>📄 Document mis à disposition</p>
+                                <button type="button"
+                                  onClick={() => selectedTask.config?.documentContenu && openBase64(selectedTask.config.documentContenu, selectedTask.config.documentMimeType)}
+                                  className="flex items-center gap-3 p-3 rounded-xl w-full text-left transition hover:opacity-80"
+                                  style={{ background: "rgba(5,150,105,0.06)", border: "1px solid rgba(5,150,105,0.2)" }}>
+                                  <span className="text-xl">📄</span>
+                                  <span className="font-medium text-sm flex-1" style={{ color: "var(--text)" }}>
+                                    {selectedTask.config.documentNom}
+                                  </span>
+                                  <span className="text-xs opacity-60">Consulter</span>
                                 </button>
                               </div>
                             )}
-                            {managerProgressionDone(selectedTask) && selectedTask.statut !== "TERMINE" && (
-                              <div className="p-3 rounded-xl text-sm text-center"
-                                style={{ background: "rgba(141,198,63,0.06)", border: "1px solid rgba(141,198,63,0.2)", color: "#059669" }}>
-                                ✅ Validé de votre côté — en attente des autres acteurs
+                            {/* Document joint par le salarié */}
+                            {selectedTask.documentNom && (
+                              <div className="space-y-2">
+                                <p className="text-xs font-semibold" style={{ color: "#d97706" }}>
+                                  📎 Document déposé par {selectedMember.salarie?.prenom}
+                                </p>
+                                <button type="button"
+                                  onClick={() => selectedTask.documentContenu && openBase64(selectedTask.documentContenu, selectedTask.documentMimeType)}
+                                  className="flex items-center gap-3 p-4 rounded-xl w-full text-left transition hover:scale-[1.01]"
+                                  style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.2)", color: "#d97706" }}>
+                                  <span className="text-2xl">📎</span>
+                                  <span className="font-medium text-sm flex-1">{selectedTask.documentNom}</span>
+                                  <span className="text-xs opacity-60">Consulter</span>
+                                </button>
+                                {needsManagerAction(selectedTask) && (
+                                  <div className="flex gap-3">
+                                    <button type="button" onClick={() => handleValidate(true)} className="btn-success flex-1 py-2.5">
+                                      ✅ Valider le document
+                                    </button>
+                                  <button 
+                                      type="button" 
+                                      onClick={() => {
+                                        setCorrectionTaskId(selectedTask.id);
+                                        setShowCorrectionModal(true);
+                                      }} 
+                                      className="btn-warning flex-1 py-2.5"
+                                      style={{ background: "#fef3c7", color: "#d97706", border: "1px solid #fde68a" }}
+                                    >
+                                      📝 Demander une correction
+                                    </button>
+                                  </div>
+                                )}
+                                {managerProgressionDone(selectedTask) && selectedTask.statut !== "TERMINE" && (
+                                  <div className="p-3 rounded-xl text-sm text-center"
+                                    style={{ background: "rgba(141,198,63,0.06)", border: "1px solid rgba(141,198,63,0.2)", color: "#059669" }}>
+                                    ✅ Validé de votre côté — en attente des autres acteurs
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -609,13 +733,40 @@ const ManagerParcoursPage = () => {
                                 <div>
                                   <p className="text-xs font-semibold" style={{ color: "#7c3aed" }}>Date planifiée</p>
                                   <p className="text-sm font-bold" style={{ color: "var(--text)" }}>
-                                    {new Date(selectedTask.dateEntretien).toLocaleDateString("fr-FR", {
-                                      weekday: "long", day: "2-digit", month: "long", year: "numeric"
-                                    })}
+                                     {new Date(selectedTask.dateEntretien).toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                                   </p>
                                 </div>
-                              </div>
+                              </div> 
                             )}
+                    {(selectedTask.config?.dureeMinutes || selectedTask.config?.lieu) && (
+  <div className="flex flex-wrap gap-4 p-3 rounded-xl"
+    style={{ background: "rgba(124,58,237,0.04)", border: "1px solid rgba(124,58,237,0.15)" }}>
+    
+    {selectedTask.config?.dureeMinutes && (
+      <div className="flex items-center gap-2">
+        <span className="text-lg">⏱️</span>
+        <div>
+          <p className="text-xs font-semibold" style={{ color: "#7c3aed" }}>Durée</p>
+          <p className="text-sm" style={{ color: "var(--text)" }}>{selectedTask.config.dureeMinutes} min</p>
+        </div>
+      </div>
+    )}
+    
+    {selectedTask.config?.dureeMinutes && selectedTask.config?.lieu && (
+      <div className="w-px h-8" style={{ background: "rgba(124,58,237,0.2)" }}></div>
+    )}
+    
+    {selectedTask.config?.lieu && (
+      <div className="flex items-center gap-2">
+        <span className="text-lg">📍</span>
+        <div>
+          <p className="text-xs font-semibold" style={{ color: "#7c3aed" }}>Lieu</p>
+          <p className="text-sm" style={{ color: "var(--text)" }}>{selectedTask.config.lieu}</p>
+        </div>
+      </div>
+    )}
+  </div>
+)}
                             {selectedTask.documentEntretienContenu && (
                               <button type="button"
                                 onClick={() => openBase64(selectedTask.documentEntretienContenu!, selectedTask.documentEntretienMimeType)}
@@ -628,15 +779,21 @@ const ManagerParcoursPage = () => {
                             )}
                             {selectedTask.statut !== "TERMINE" && (
                               <button type="button"
-                                onClick={() => { setEntretienDate(selectedTask.dateEntretien || ""); setEntretienFile(null); setEntretienDocPreview(null); setShowEntretienModal(true); }}
+                                onClick={() => { setEntretienDate(selectedTask.dateEntretien || ""); setEntretienFile(null); setEntretienDocPreview(null);    
+                               setShowEntretienModal(true); }}
                                 className="btn-primary w-full py-2.5">
-                                {selectedTask.dateEntretien ? "✏️ Modifier l'entretien" : "📅 Planifier l'entretien"}
+                                {selectedTask.dateEntretien ? "📅 Reprogrammer l'entretien" : "📅 Planifier l'entretien"}
                               </button>
                             )}
                             {selectedTask.dateEntretien && !managerProgressionDone(selectedTask) && selectedTask.statut !== "TERMINE" && (
+                              <div className="flex gap-3">
                               <button type="button" onClick={() => handleValidate(true)} className="btn-success w-full py-2.5">
                                 ✅ Valider — Entretien effectué
                               </button>
+                              {/*<button type="button" onClick={() => handleValidate(false)} className="btn-danger flex-1 py-2.5">
+                               ❌ Rejeter l'entretien
+                              </button>*/}
+                              </div>
                             )}
                             {managerProgressionDone(selectedTask) && selectedTask.statut !== "TERMINE" && (
                               <div className="p-3 rounded-xl text-sm text-center"
@@ -649,10 +806,9 @@ const ManagerParcoursPage = () => {
 
                         {/* Tâche SIMPLE/FORMATION avec manager comme acteur */}
                         {selectedTask.taskType !== "ENTRETIEN" &&
-                         selectedTask.taskType !== "DOCUMENT_SALARIE" &&
                          managerIsActeur(selectedTask) &&
                          selectedTask.statut !== "TERMINE" &&
-                         selectedTask.statut !== "REJETE" && (
+                         !selectedTask.config?.typeDocumentAttendu && (
                           <div className="card p-5 space-y-3">
                             <p className="text-sm font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>
                               Actions manager
@@ -664,9 +820,7 @@ const ManagerParcoursPage = () => {
                                   className="btn-success flex-1 py-2.5">
                                   {completeMutation.isPending ? "..." : "✅ Marquer comme effectué"}
                                 </button>
-                                <button type="button" onClick={() => handleValidate(false)} className="btn-danger flex-1 py-2.5">
-                                  ❌ Rejeter
-                                </button>
+                               
                               </div>
                             ) : (
                               <div className="p-3 rounded-xl text-sm text-center"
@@ -708,101 +862,221 @@ const ManagerParcoursPage = () => {
                           </div>
                         )}
 
-                        {/* Commentaires */}
-                        <div className="card p-5 space-y-3">
-                          <p className="text-sm font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>💬 Commentaires</p>
-                          {selectedTask.commentaires.length === 0 ? (
-                            <p className="text-xs" style={{ color: "var(--text-muted)" }}>Aucun commentaire</p>
-                          ) : (
-                            <div className="space-y-2">
-                              {selectedTask.commentaires.map((c, i) => (
-                                <div key={i} className="p-3 rounded-xl"
-                                  style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-xs font-semibold" style={{ color: "var(--text)" }}>{c.auteurNom}</span>
-                                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                                      {new Date(c.date).toLocaleDateString("fr-FR")}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs" style={{ color: "var(--text)" }}>{c.texte}</p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            <input type="text" value={commentText}
-                              onChange={(e) => setCommentText(e.target.value)}
-                              placeholder="Ajouter un commentaire..."
-                              className="input-field flex-1 text-sm"
-                              onKeyDown={(e) => e.key === "Enter" && commentText.trim() &&
-                                commentMutation.mutate({ taskId: selectedTask.id, data: { auteurId: userId!, auteurNom: "Manager", texte: commentText } })} />
-                            <button type="button"
-                              onClick={() => commentText.trim() && commentMutation.mutate({ taskId: selectedTask.id, data: { auteurId: userId!, auteurNom: "Manager", texte: commentText } })}
-                              disabled={!commentText.trim() || commentMutation.isPending}
-                              className="btn-primary px-4 py-2 text-sm">Envoyer</button>
-                          </div>
-                        </div>
+                      {/* Commentaires */}
+<div className="card p-5 space-y-3">
+  <p className="text-sm font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>💬 Commentaires</p>
+  {selectedTask.commentaires.length === 0 ? (
+    <p className="text-xs" style={{ color: "var(--text-muted)" }}>Aucun commentaire</p>
+  ) : (
+    <div className="space-y-2">
+      {selectedTask.commentaires.map((c, i) => (
+        <div key={i} className="p-3 rounded-xl"
+          style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-semibold" style={{ color: "var(--text)" }}>{c.auteurNom}</span>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {new Date(c.date).toLocaleDateString("fr-FR")}
+            </span>
+          </div>
+          <p className="text-xs" style={{ color: "var(--text)" }}>{c.texte}</p>
+        </div>
+      ))}
+    </div>
+  )}
+  
+  {/* Formulaire d'ajout avec le vrai nom du manager */}
+  {currentUser && (
+    <div className="flex gap-2">
+      <input 
+        type="text" 
+        value={commentText}
+        onChange={(e) => setCommentText(e.target.value)}
+        placeholder="Ajouter un commentaire..."
+        className="input-field flex-1 text-sm"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && commentText.trim()) {
+            const fullName = `Manager : ${currentUser.prenom || ""} ${currentUser.nom || ""}`.trim();
+            commentMutation.mutate({ 
+              taskId: selectedTask.id, 
+              data: { auteurId: userId!, auteurNom: fullName, texte: commentText } 
+            });
+          }
+        }}
+      />
+      <button 
+        type="button"
+        onClick={() => {
+          if (commentText.trim()) {
+           const fullName = `Manager : ${currentUser.prenom || ""} ${currentUser.nom || ""}`.trim();
+            commentMutation.mutate({ 
+              taskId: selectedTask.id, 
+              data: { auteurId: userId!, auteurNom: fullName, texte: commentText } 
+            });
+          }
+        }}
+        disabled={!commentText.trim() || commentMutation.isPending}
+        className="btn-primary px-4 py-2 text-sm"
+      >
+        {commentMutation.isPending ? "..." : "Envoyer"}
+      </button>
+    </div>
+  )}
+</div>
+
                       </div>
                     )}
                   </div>
+
                 </div>
               )}
             </div>
           </div>
         )}
+{/* ── Tab Tâches à traiter ── */}
+{activeTab === "taches" && (
+  <div className="px-8 py-6">
+    {/* 📍 SECTION QUIZ BLOQUÉS - TOUJOURS VISIBLE (en haut) */}
+    {(() => {
+      const blockedQuizzes = teamList.flatMap(m =>
+        (m.tasks || [])
+          .filter(t =>
+            t.taskType === "QUIZ" &&
+            t.verrouille === true &&
+            t.nbTentatives >= 3
+          )
+          .map(t => ({ ...t, salarie: m.salarie }))
+      );
 
-        {/* ── Tab Tâches à traiter ── */}
-        {activeTab === "taches" && (
-          <div className="px-8 py-6">
-            {tasksPendingAction.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-4">
-                <span className="text-6xl">✅</span>
-                <p className="text-lg font-semibold" style={{ color: "var(--text-muted)", fontFamily: "Sora" }}>
-                  Aucune tâche en attente
-                </p>
-                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  Toutes les tâches assignées au manager sont traitées.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--text-muted)" }}>
-                  {tasksPendingAction.length} tâche{tasksPendingAction.length > 1 ? "s" : ""} en attente d'action
-                </p>
-                {tasksPendingAction.map((task: any) => {
-                  const typeConf   = TASK_TYPE_CONFIG[task.taskType as TaskType];
-                  const statutConf = STATUT_CONFIG[task.statut as StatutTask];
-                  return (
-                    <div key={task.id} className="card p-5 flex items-center gap-4"
-                      style={{ border: "1px solid rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.02)" }}>
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-                        style={{ background: typeConf.bg }}>{typeConf.icon}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-sm" style={{ color: "var(--text)", fontFamily: "Sora" }}>{task.titre}</p>
-                          <span className="text-xs px-2 py-0.5 rounded-full"
-                            style={{ background: statutConf.bg, color: statutConf.color }}>{statutConf.label}</span>
-                        </div>
-                        <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                          👤 {task._salarie?.prenom} {task._salarie?.nom}
-                        </p>
-                      </div>
-                      <button type="button"
-                        onClick={() => {
-                          const member = teamList.find(m => m.salarie?.id === task._salarie?.id);
-                          if (member) { setSelectedMember(member); setSelectedTask(task); setActiveTab("parcours"); }
-                        }}
-                        className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition hover:scale-105"
-                        style={{ background: "rgba(0,174,239,0.1)", color: "#00AEEF", border: "1px solid rgba(0,174,239,0.2)" }}>
-                        Traiter →
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+      if (blockedQuizzes.length === 0) return null;
+
+      return (
+        <div className="mb-8">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+              style={{ background: "rgba(220,38,38,0.1)" }}>
+              🔒
+            </div>
+            <div>
+              <h3 className="font-bold text-base" style={{ color: "var(--text)", fontFamily: "Sora" }}>
+                Quiz bloqués
+              </h3>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {blockedQuizzes.length} quiz{blockedQuizzes.length > 1 ? "s" : ""} en attente de déblocage — 3 tentatives épuisées
+              </p>
+            </div>
+            <span className="ml-auto text-xs font-bold px-2.5 py-1 rounded-full"
+              style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>
+              {blockedQuizzes.length}
+            </span>
           </div>
-        )}
+
+          {/* List */}
+          <div className="space-y-3">
+            {blockedQuizzes.map(quiz => (
+              <div key={quiz.id}
+                className="flex items-center gap-4 p-4 rounded-2xl transition-all"
+                style={{
+                  background: "rgba(220,38,38,0.04)",
+                  border: "1.5px solid rgba(220,38,38,0.15)",
+                }}>
+                {/* Employee avatar */}
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                  style={{ background: "linear-gradient(135deg, #1A2B6B, #00AEEF)" }}>
+                  {quiz.salarie?.prenom?.[0]}{quiz.salarie?.nom?.[0]}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-sm truncate" style={{ color: "var(--text)", fontFamily: "Sora" }}>
+                      {quiz.titre}
+                    </p>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+                      style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>
+                      ❌ {quiz.nbTentatives}/3 tentatives
+                    </span>
+                  </div>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                    Salarié : <span className="font-semibold" style={{ color: "var(--text)" }}>
+                      {quiz.salarie?.prenom} {quiz.salarie?.nom}
+                    </span>
+                    {quiz.config?.scoreMinimum && (
+                      <span> · Score minimum requis : {quiz.config.scoreMinimum}%</span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Unlock button */}
+                <button
+                  onClick={() => handleUnlockQuiz(quiz.id)}
+                  className="px-4 py-2 rounded-xl text-white text-sm font-semibold transition-all hover:opacity-90 flex-shrink-0 flex items-center gap-1.5"
+                  style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
+                >
+                  🔓 Débloquer
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    })()}
+
+    {/* 📍 SECTION TÂCHES EN ATTENTE */}
+    {tasksPendingAction.length === 0 ? (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <span className="text-6xl">✅</span>
+        <p className="text-lg font-semibold" style={{ color: "var(--text-muted)", fontFamily: "Sora" }}>
+          Aucune tâche en attente
+        </p>
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          Toutes les tâches assignées au manager sont traitées.
+        </p>
+      </div>
+    ) : (
+      <div className="space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--text-muted)" }}>
+          {tasksPendingAction.length} tâche{tasksPendingAction.length > 1 ? "s" : ""} en attente d'action
+        </p>
+        {tasksPendingAction.map((task: any) => {
+          const typeConf = TASK_TYPE_CONFIG[task.taskType as TaskType];
+          const statutConf = STATUT_CONFIG[task.statut as StatutTask];
+          return (
+            <div key={task.id} className="card p-5 flex items-center gap-4"
+              style={{ border: "1px solid rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.02)" }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                style={{ background: typeConf.bg }}>{typeConf.icon}</div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-sm" style={{ color: "var(--text)", fontFamily: "Sora" }}>{task.titre}</p>
+                  <span className="text-xs px-2 py-0.5 rounded-full"
+                    style={{ background: statutConf.bg, color: statutConf.color }}>{statutConf.label}</span>
+                </div>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  👤 {task._salarie?.prenom} {task._salarie?.nom}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const member = teamList.find(m => m.salarie?.id === task._salarie?.id);
+                  if (member) {
+                    setSelectedMember(member);
+                    setSelectedTask(task);
+                    setActiveTab("parcours");
+                  }
+                }}
+                className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition hover:scale-105"
+                style={{ background: "rgba(0,174,239,0.1)", color: "#00AEEF", border: "1px solid rgba(0,174,239,0.2)" }}>
+                Traiter →
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+)}
       </main>
 
       {/* ── Modal Validation ── */}
@@ -813,7 +1087,7 @@ const ManagerParcoursPage = () => {
             style={{ background: "var(--surface)", maxWidth: "460px", zIndex: 51 }}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>
-                {validateApprouve ? "✅ Valider la tâche" : "❌ Rejeter la tâche"}
+                   ✅ Valider la tâche
               </h3>
               <button type="button" onClick={() => setShowValidateModal(false)}
                 className="w-9 h-9 rounded-full flex items-center justify-center"
@@ -844,7 +1118,75 @@ const ManagerParcoursPage = () => {
           </div>
         </div>
       )}
+      {/* ── Modal Déblocage Quiz ── */}
+{showUnlockModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setShowUnlockModal(false); setUnlockComment(""); }} />
+    <div className="relative rounded-2xl shadow-2xl p-6 w-full mx-4"
+      style={{ background: "var(--surface)", maxWidth: "440px", zIndex: 51 }}>
 
+      {/* Icône */}
+      <div className="flex justify-center mb-4">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl"
+          style={{ background: "rgba(245,158,11,0.15)" }}>
+          🔓
+        </div>
+      </div>
+
+      {/* Titre */}
+      <h3 className="text-xl font-bold text-center mb-1" style={{ color: "var(--text)", fontFamily: "Sora" }}>
+        Débloquer le quiz
+      </h3>
+      <p className="text-sm text-center mb-5" style={{ color: "var(--text-muted)" }}>
+        Le salarié pourra effectuer une nouvelle tentative.
+      </p>
+
+      {/* Champ commentaire */}
+      <div className="mb-5">
+        <label className="block text-xs font-bold mb-2 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+          Message au salarié <span style={{ color: "#94a3b8", fontWeight: 400 }}>(optionnel)</span>
+        </label>
+        <textarea
+          value={unlockComment}
+          onChange={(e) => setUnlockComment(e.target.value)}
+          placeholder="Ex : Prenez le temps de relire le module de formation avant de retenter…"
+          rows={3}
+          className="input-field w-full text-sm"
+          style={{ resize: "none" }}
+        />
+        <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>
+          Ce message apparaîtra dans les commentaires de la tâche.
+        </p>
+      </div>
+
+      {/* Boutons */}
+      <div className="flex gap-3">
+        <button
+          onClick={confirmUnlockQuiz}
+          disabled={unlockQuizMutation.isPending}
+          className="flex-1 py-2.5 rounded-xl font-semibold text-white transition hover:opacity-90 flex items-center justify-center gap-2"
+          style={{ background: "#f59e0b" }}
+        >
+          {unlockQuizMutation.isPending ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Déblocage…
+            </>
+          ) : (
+            "🔓 Débloquer"
+          )}
+        </button>
+        <button
+          onClick={() => { setShowUnlockModal(false); setUnlockComment(""); }}
+          className="flex-1 py-2.5 rounded-xl font-semibold transition hover:bg-slate-100"
+          style={{ background: "var(--bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+        >
+          Annuler
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {/* ── Modal Entretien ── */}
       {showEntretienModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -862,6 +1204,7 @@ const ManagerParcoursPage = () => {
                 className="w-9 h-9 rounded-full flex items-center justify-center"
                 style={{ background: "var(--border)", color: "var(--text-muted)" }}>✕</button>
             </div>
+           
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold mb-2 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
@@ -898,6 +1241,32 @@ const ManagerParcoursPage = () => {
                   </div>
                 )}
               </div>
+              
+        {/* 🔥 LE CHAMP RAISON 🔥 */}
+        {selectedTask?.dateEntretien && (
+          <div>
+            <label  className="block text-xs font-bold mb-2" style={{ color: "var(--text-muted)" }}>
+              Raison de la reprogrammation *
+            </label> 
+            <input 
+              type="text" 
+              value={reprogrammationRaison}
+              onChange={(e) => setReprogrammationRaison(e.target.value)}
+              placeholder="Ex: Document incomplet, Absence du salarié..."
+              className="input-field text-sm"
+            />
+          </div>
+        )}
+
+        {/* Message d'information pour reprogrammation */}
+        {selectedTask?.dateEntretien && (
+          <div className="p-3 rounded-xl text-xs"
+            style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", color: "#f59e0b" }}>
+            ⚠️ L'ancienne date ({new Date(selectedTask.dateEntretien).toLocaleDateString("fr-FR")}) 
+            sera remplacée
+          </div>
+        )}
+        
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={handlePlanifierEntretien}
                   disabled={!entretienDate || entretienMutation.isPending} className="btn-primary flex-1 py-3">
@@ -907,14 +1276,57 @@ const ManagerParcoursPage = () => {
                     </span>
                   ) : "📅 Confirmer l'entretien"}
                 </button>
-                <button type="button" onClick={() => setShowEntretienModal(false)} className="btn-secondary px-6 py-3">Annuler</button>
+                <button type="button"onClick={() => { 
+                    setShowEntretienModal(false); 
+                    setReprogrammationRaison(""); // ✅ AJOUTER
+                  }} className="btn-secondary px-6 py-3">Annuler</button>
               </div>
             </div>
           </div>
         </div>
       )}
+      {showCorrectionModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="absolute inset-0 bg-black/60" onClick={() => setShowCorrectionModal(false)} />
+    <div className="relative rounded-3xl shadow-2xl p-8 w-full mx-4"
+      style={{ background: "var(--surface)", maxWidth: "460px", zIndex: 51 }}>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-bold" style={{ fontFamily: "Sora" }}>
+          📝 Demander une correction
+        </h3>
+        <button onClick={() => setShowCorrectionModal(false)} className="w-9 h-9 rounded-full flex items-center justify-center"
+          style={{ background: "var(--border)", color: "var(--text-muted)" }}>✕</button>
+      </div>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-xs font-bold mb-2 uppercase tracking-wide">
+            Raison de la correction *
+          </label>
+          <textarea 
+            value={correctionReason}
+            onChange={(e) => setCorrectionReason(e.target.value)}
+            placeholder="Expliquez au salarié ce qui doit être corrigé..."
+            rows={3} 
+            className="input-field" 
+            style={{ resize: "none" }} 
+          />
+        </div>
+        <div className="flex gap-3">
+          <button onClick={handleDemanderCorrection} className="btn-warning flex-1 py-3"
+            style={{ background: "#f59e0b", color: "white", border: "none" }}>
+            Envoyer la demande
+          </button>
+          <button onClick={() => setShowCorrectionModal(false)} className="btn-secondary px-6 py-3">
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
+  
 };
 
 export default ManagerParcoursPage;

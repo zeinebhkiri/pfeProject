@@ -39,7 +39,7 @@ public class User {
 
     private LocalDateTime dateCreation;
     private LocalDateTime dateValidation;
-    private String poste; // ← AJOUTER après dateValidation
+    //private String poste; // ← AJOUTER après dateValidation
     private LocalDateTime dateLimit;
     private ProfessionalInfo professionalInfo;
     @Data
@@ -49,29 +49,27 @@ public class User {
         private String rib;
         private String telephone;
         private String image;
-        // ───── NOUVELLES COORDONNEES PERSONNELLES ─────
-
         private String numeroCnss;
         private LocalDate dateNaissance;
         private String lieuNaissance;
         private String nomBanque;
-        private String statutSocial; // MARIE / CELIBATAIRE
+        private String statutSocial;
         private String nationalite;
-        private String genre; // HOMME / FEMME
+        private String genre;
         private String photoPoste;
         private List<Document> documents = new ArrayList<>();
 
     }
-    //classe Document imbriquée
+
     @Data
     @AllArgsConstructor
     @NoArgsConstructor
     public static class Document {
-        private String id;           // UUID généré
-        private String nom;          // nom du fichier
-        private String type;         // "RIB", "DIPLOME", "CIN", "AUTRE"
-        private String contenu;      // base64
-        private String mimeType;     // "application/pdf", "image/jpeg"...
+        private String id;
+        private String nom;
+        private String type;
+        private String contenu;
+        private String mimeType;
         private LocalDateTime dateUpload;
     }
     @Data
@@ -81,7 +79,7 @@ public class User {
         private String emailProfessionnel;
         private String telephoneProfessionnel;
         private LocalDate dateEmbauche;
-        private LocalDate datePriseDePoste; // ← NOUVEAU
+        private LocalDate datePriseDePoste;
         private boolean datePriseDePostePersonnalisee = false;
 
     }

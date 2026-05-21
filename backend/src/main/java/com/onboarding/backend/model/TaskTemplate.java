@@ -23,38 +23,34 @@ public class TaskTemplate {
     private List<TypeActeur> typeActeurs;
     private int ordre;
     private boolean obligatoire = true;
-    private int delaiJours; // délai en jours depuis le début du parcours
+    private int delaiJours;
     private String phase;
     private TaskConfig config;
 
     @Data
     @NoArgsConstructor
     public static class TaskConfig {
-        // ── FORMATION ──
+        // FORMATION
         private String videoUrl;
-        private String fichierContenu;  // base64
+        private String fichierContenu;
         private String fichierNom;
         private String fichierMimeType;
 
-        // ── QUIZ ──
+        // QUIZ
         private List<Question> questions;
-        private int scoreMinimum; // ex: 70 = 70%
+        private int scoreMinimum;
 
-        // ── DOCUMENT_RH ──
-        private String documentContenu; // base64
-        private String documentNom;
-        private String documentMimeType;
-
-        // ── DOCUMENT_SALARIE ──
-        private String typeDocumentAttendu; // ex: "Contrat signé"
-
-        // ── ENTRETIEN ──
+        //  ENTRETIEN
         private Integer dureeMinutes;
         private String lieu;
         private String notesEntretien;
 
-        // ── SIMPLE ──
-        private String datePlanifiee; // optionnel
+        // SIMPLE
+        private String datePlanifiee;
+        private String documentContenu;
+        private String documentNom;
+        private String documentMimeType;
+        private String typeDocumentAttendu;
     }
 
     @Data
@@ -62,8 +58,8 @@ public class TaskTemplate {
     public static class Question {
         private String id;
         private String texte;
-        private List<String> options; // 4 options
-        private int bonneReponse;     // index 0-3
+        private List<String> options;
+        private int bonneReponse;
         private int points;
     }
 }

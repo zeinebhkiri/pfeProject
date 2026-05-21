@@ -20,9 +20,21 @@ const adminLinks = [
     ),
   },
   {
-    label: "Équipe IT",
+    label: "Équipe ",
     isGroup: true,
     children: [
+      {
+    label: "Annuaire",        
+    to: "/equipe",            
+    icon: (                   
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    ),
+  },
       {
         label: "Salariés",
         to: "/admin/salaries",
@@ -93,7 +105,50 @@ const adminLinks = [
       <line x1="6" y1="20" x2="6" y2="14"/>
     </svg>
   ),
+}, 
+ {
+    label: "Archives",
+    isGroup: true,
+    children: [
+      {
+        label: "Parcours terminés",
+        to: "/admin/archives/parcours-termines",
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 4v16h16V4H4z M8 9h8 M8 13h6"/>
+          </svg>
+        ),
+      },
+       {
+        label: "Anciens collaborateurs",
+        to: "/admin/archives/anciens",
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            <line x1="16" y1="8" x2="22" y2="8"/>
+          </svg>
+        ),
+      },
+      {
+  label: "Modèles archivés",
+  to: "/admin/archives/parcours-templates",
+  icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M4 4v16h16V4H4z M8 9h8 M8 13h6"/>
+    </svg>
+  ),
 },
+ {
+      label: "Postes archivés",
+      to: "/admin/archives/postes",
+      icon: ( <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4v16h16V4H4z M8 9h8 M8 13h6"/></svg> ),
+    },
+    ],
+  },
+
 ];
 
 const salarieLinks = [
@@ -119,6 +174,38 @@ const salarieLinks = [
     </svg>
   ),
 },
+  {
+  label: "Mon profil",
+  to: "/profile",
+  icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
+    </svg>
+  ),
+},
+ {
+    label: "Annuaire",        // ✅ AJOUTER
+    to: "/equipe",            // ✅ AJOUTER
+    icon: (                   // ✅ AJOUTER
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    ),
+  },
+  {
+    label: "Évaluation",
+    to: "/feedback",
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5"/>
+        <path d="M17.5 2.5a2.121 2.121 0 0 1 3 3L12 14l-4 1 1-4 8.5-8.5z"/>
+      </svg>
+    ),
+  },
 ];
 
 const managerLinks = [
@@ -182,6 +269,40 @@ const managerLinks = [
       </svg>
     ),
   },
+   {
+  label: "Mon profil",
+  to: "/profile",
+  icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
+    </svg>
+  ),
+},
+ {
+    label: "Annuaire",        // ✅ AJOUTER
+    to: "/equipe",            // ✅ AJOUTER
+    icon: (                   // ✅ AJOUTER
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    ),
+  },
+   {
+  label: "🏆 Classement",
+  to: "/manager/leaderboard",
+  icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="18" y1="20" x2="18" y2="10"/>
+      <line x1="12" y1="20" x2="12" y2="4"/>
+      <line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
+  ),
+},
+
 ];
 
 /* ── Logo Square IT ── */

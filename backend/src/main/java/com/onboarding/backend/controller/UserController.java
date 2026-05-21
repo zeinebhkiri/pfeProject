@@ -75,7 +75,7 @@ public class UserController {
 
     // ── Liste tous les utilisateurs — ADMIN uniquement (exclut les DESACTIVE) ──
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<User>> getAllUsers() {
         // ⭐ MODIFICATION 1: Exclure les comptes désactivés
         List<User> activeUsers = userRepository.findAll().stream()
@@ -131,6 +131,32 @@ public class UserController {
         user.setStatutCompte(StatutCompte.DESACTIVE);
         userRepository.save(user);
         return ResponseEntity.ok(Map.of("message", "Compte désactivé."));
+    }
+    // ── Réactiver un compte désactivé — ADMIN uniquement ─────────────────────
+    @PutMapping("/{id}/reactiver")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, String>> reactiverUser(@PathVariable String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        // Vérifier que le compte est bien désactivé
+        if (user.getStatutCompte() != StatutCompte.DESACTIVE) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", "Seul un compte désactivé peut être réactivé.")
+            );
+        }
+
+        // Réactiver le compte (remettre à VALIDE comme avant désactivation)
+        user.setStatutCompte(StatutCompte.VALIDE);
+        userRepository.save(user);
+
+        // 🔥 Envoyer un email de notification
+        emailService.sendReactivationEmail(
+                user.getEmail(),
+                user.getPrenom() + " " + user.getNom()
+        );
+
+        return ResponseEntity.ok(Map.of("message", "Compte réactivé avec succès."));
     }
 
     // ── Liste tous les SALARIES (exclut les DESACTIVE) ──────────────────────
@@ -354,7 +380,24 @@ public class UserController {
         userRepository.save(user);
         return ResponseEntity.ok(user);
     }
+    // Dans votre contrôleur
+    @GetMapping("/my-manager")
+    @PreAuthorize("hasRole('SALARIE') or hasRole('MANAGER')")
+    public ResponseEntity<User> getMyManager(
+            @AuthenticationPrincipal UserDetails userDetails) {
 
+        User currentUser = userRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        Affectation affectation = affectationRepository
+                .findByUserId(currentUser.getId())
+                .orElseThrow(() -> new RuntimeException("Aucune affectation trouvée"));
+
+        User manager = userRepository.findById(affectation.getManagerId())
+                .orElseThrow(() -> new RuntimeException("Manager non trouvé"));
+
+        return ResponseEntity.ok(manager);
+    }
     @Data
     public static class ProfessionalInfoRequest {
         private String emailProfessionnel;

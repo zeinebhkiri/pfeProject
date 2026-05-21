@@ -95,7 +95,7 @@ public class AuthService {
         ActivationToken activationToken = new ActivationToken();
         activationToken.setToken(tokenValue);
         activationToken.setUserId(savedUser.getId());
-        activationToken.setExpirationDate(LocalDateTime.now().plusHours(5));
+        activationToken.setExpirationDate(LocalDateTime.now().plusDays(7));
         activationToken.setUsed(false);
         tokenRepository.save(activationToken);
         System.out.println("=== DEBUG TIME CHECK ===");

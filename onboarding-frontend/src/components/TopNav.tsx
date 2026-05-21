@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import NotificationBell from "./NotificationBell";
 
 interface TopNavProps {
   searchValue?: string;
@@ -47,6 +48,10 @@ const TopNav = ({
       )}
 
       <div className="flex items-center gap-3">
+        {/* 🔔 Cloche de notifications — uniquement pour les salariés */}
+        {role === "SALARIE" && <NotificationBell />}
+
+        {/* Avatar / profil */}
         <button
           onClick={() => navigate(profilePath)}
           className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-bold text-sm hover:scale-105 transition-transform shadow-md"

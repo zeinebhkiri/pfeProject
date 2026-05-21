@@ -115,6 +115,12 @@ const AdminPostesPage = () => {
             <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
               {(positions as Position[]).length} poste{(positions as Position[]).length > 1 ? "s" : ""} configuré{(positions as Position[]).length > 1 ? "s" : ""}
             </p>
+            <a 
+              href="/admin/archives/postes" 
+      className="text-xs text-[#00AEEF] hover:underline mt-1 inline-flex items-center gap-1"
+    >
+      🗂️ Voir les postes archivés →
+    </a>
           </div>
           <button type="button"
             onClick={openCreate}

@@ -49,7 +49,7 @@ public class SecurityConfig {
 
                         // ── Routes ADMIN (RH) uniquement ───────────────────────────────
                         .requestMatchers("/api/auth/create-employee").hasRole("ADMIN")
-                        .requestMatchers("/api/users").hasRole("ADMIN")
+                        //.requestMatchers("/api/users").hasRole("ADMIN")
 
                         // ── Routes MANAGER + ADMIN ──────────────────────────────────────
                         .requestMatchers("/api/manager/**").hasAnyRole("MANAGER", "ADMIN")

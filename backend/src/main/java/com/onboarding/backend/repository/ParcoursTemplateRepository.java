@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface ParcoursTemplateRepository extends MongoRepository<ParcoursTemplate, String> {
     Optional<ParcoursTemplate> findByPositionIdAndActifTrue(String positionId);
     List<ParcoursTemplate> findByActifTrue();
+    // ── Archive : modèles archivés (actif = false) ───────────────────────────
+    List<ParcoursTemplate> findByActifFalse();
 }

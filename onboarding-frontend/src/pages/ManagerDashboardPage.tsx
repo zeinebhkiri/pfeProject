@@ -8,6 +8,7 @@ import Sidebar from "../components/Sidebar";
 import CompanyDocumentsWidget from "../components/CompanyDocumentsWidget";
 import { useMemo, useState } from "react";
 
+
 const statutConfig: Record<string, { label: string; color: string; bg: string }> = {
   EN_ATTENTE: { label: "En attente",   color: "#d97706", bg: "#fffbeb" },
   ACCEPTE:    { label: "Profil soumis",color: "#2563eb", bg: "#eff6ff" },
@@ -341,6 +342,7 @@ const userPosteMap = useMemo(() => {
                               </div>
                             </div>
                           </td>
+                          
                           <td className="px-5 py-4">
                             <span className="badge text-xs px-2 py-1 rounded-lg font-medium"
                               style={{ background: s?.bg, color: s?.color }}>
@@ -391,6 +393,7 @@ const userPosteMap = useMemo(() => {
 
             {/* Documents entreprise */}
             <CompanyDocumentsWidget />
+           
           </div>
         </div>
       </main>

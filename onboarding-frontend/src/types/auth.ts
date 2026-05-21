@@ -126,8 +126,6 @@ export interface Position {
 export type TaskType =
   | "FORMATION"
   | "QUIZ"
-  | "DOCUMENT_RH"
-  | "DOCUMENT_SALARIE"
   | "ENTRETIEN"
   | "SIMPLE";
 
@@ -136,8 +134,7 @@ export type TypeActeur = "SALARIE" | "MANAGER" | "RH";
 export type StatutTask =
   | "NON_COMMENCE"
   | "EN_COURS"
-  | "TERMINE"
-  | "REJETE";
+  | "TERMINE";
 
 export type StatutParcours = "EN_COURS" | "TERMINE" | "EXPIRE";
 
@@ -158,18 +155,16 @@ export interface TaskConfig {
   // QUIZ
   questions?: Question[];
   scoreMinimum?: number;
-  // DOCUMENT_RH
-  documentContenu?: string;
-  documentNom?: string;
-  documentMimeType?: string;
-  // DOCUMENT_SALARIE
-  typeDocumentAttendu?: string;
   // ENTRETIEN
   dureeMinutes?: number;
   lieu?: string;
   notesEntretien?: string;
-  // SIMPLE
+  // SIMPLE — pièce jointe optionnelle
   datePlanifiee?: string;
+  documentContenu?: string;
+  documentNom?: string;
+  documentMimeType?: string;
+  typeDocumentAttendu?: string; // indique ce qui est attendu (ex: "Contrat signé")
 }
 
 export interface TaskTemplate {

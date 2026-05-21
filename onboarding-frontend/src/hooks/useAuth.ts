@@ -6,6 +6,8 @@ export const useAuth = () => {
   const role = localStorage.getItem("user_role") as UserRole | null;
   const userId = localStorage.getItem("user_id");
 
+  
+
   const isAuthenticated = !!token;
   const isAdmin = role === "ADMIN";        // RH
   const isManager = role === "MANAGER";
@@ -16,6 +18,7 @@ export const useAuth = () => {
     localStorage.setItem("user_email", email);
     localStorage.setItem("user_role", role);
     localStorage.setItem("user_id", userId);
+   
   };
 
   const logout = () => {
@@ -23,6 +26,7 @@ export const useAuth = () => {
     localStorage.removeItem("user_email");
     localStorage.removeItem("user_role");
     localStorage.removeItem("user_id");
+   
   };
 
   return {

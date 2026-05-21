@@ -11,7 +11,7 @@ import {
   type UserDocument,
   type CompanyDocument,
   type Position,
-    type ParcoursTemplate,
+  type ParcoursTemplate,
   type TaskTemplate,
   type Parcours,
   type Task,
@@ -409,6 +409,7 @@ export const addCommentTaskApi = async (
 
 export const getAssignedTasksApi = async (): Promise<Task[]> => {
   const res = await api.get<Task[]>("/tasks/assigned");
+  console.log("API assigned tasks:", res.data);
   return res.data;
 };
 export const planifierEntretienApi = async (
@@ -421,5 +422,109 @@ export const planifierEntretienApi = async (
   }
 ): Promise<Task> => {
   const res = await api.put<Task>(`/tasks/${taskId}/planifier-entretien`, data);
+  return res.data;
+};
+// authApi.ts
+export const getMyManagerApi = async () => {
+  const response = await api.get("/users/my-manager");
+  return response.data;
+};
+export const getAllActiveUsersApi = async () => {
+  const response = await api.get("/users/all-active-users");
+  return response.data;
+};
+export const unlockQuizApi = (taskId: string, data?: { commentaire?: string; auteurId?: string; auteurNom?: string }) =>
+  api.put(`/tasks/${taskId}/unlock-quiz`, data || {});
+// ─────────────────────────────────────────────────────────────────────────────
+// ARCHIVE API — à ajouter à la fin de authApi.ts
+// ─────────────────────────────────────────────────────────────────────────────
+ 
+// 1. Parcours terminés
+export const getParcoursTerminesApi = async (): Promise<
+  { parcours: Parcours; salarie: User | null; tasks: Task[] }[]
+> => {
+  const res = await api.get("/archive/parcours-termines");
+  return res.data;
+};
+ 
+// 2. Anciens collaborateurs (statutCompte = DESACTIVE)
+export const getAnciensCollaborateursApi = async (): Promise<
+  { salarie: User; parcours: Parcours | null; tasks: Task[] }[]
+> => {
+  const res = await api.get("/archive/anciens-collaborateurs");
+  return res.data;
+};
+ 
+// 3. Modèles de parcours archivés
+export const getModelesArchivesApi = async (): Promise<ParcoursTemplate[]> => {
+  const res = await api.get("/archive/modeles-archives");
+  return res.data;
+};
+ 
+// 4. Restaurer un modèle archivé
+export const restaurerModeleApi = async (id: string): Promise<{ message: string }> => {
+  const res = await api.put(`/archive/modeles-archives/${id}/restaurer`);
+  return res.data;
+};
+// Réactiver un compte
+export const reactiverUserApi = (userId: string): Promise<{ message: string }> =>
+  api.put(`/users/${userId}/reactiver`);
+// Récupérer tous les parcours archivés
+export const getParcoursArchivesApi = async (): Promise<any[]> => {
+  const res = await api.get("/archive/parcours-archives");
+  return res.data;
+};
+// ── Postes archivés ───────────────────────────────────────────────
+export const getPostesArchivesApi = async (): Promise<Position[]> => {
+  const res = await api.get("/archive/postes-archives");
+  return res.data;
+};
+
+export const restaurerPosteApi = async (id: string): Promise<{ message: string }> => {
+  const res = await api.put(`/archive/postes-archives/${id}/restaurer`);
+  return res.data;
+};
+export const deleteTaskDocumentApi = async (taskId: string): Promise<Task> => {
+  const res = await api.delete(`/tasks/${taskId}/document`);
+  return res.data;
+};
+
+// ─── Feedback / Évaluation d'intégration ─────────────────────────────────────
+
+export interface FeedbackRequest {
+  poste?: string;
+  dateFinIntegration?: string;
+  qualiteAccueil: number;
+  clarteInformations: number;
+  accompagnementManager: number;
+  adaptationTaches: number;
+  delaiSuffisant: number;
+  difficultesRencontrees: boolean;
+  precisionDifficulties?: string;
+  faciliteUtilisation: number;
+  fonctionnalitesAdaptees: number;
+  problemTechniques: boolean;
+  satisfactionGlobale: number;
+  recommandeProcessus: boolean;
+  suggestions?: string;
+}
+
+export const submitFeedbackApi = async (data: FeedbackRequest): Promise<any> => {
+  const res = await api.post("/feedback", data);
+  return res.data;
+};
+
+export const getMyFeedbackStatusApi = async (): Promise<{ submitted: boolean; feedback: any }> => {
+  const res = await api.get("/feedback/my-status");
+  return res.data;
+};
+
+export const getAllFeedbacksApi = async (): Promise<any[]> => {
+  const res = await api.get("/feedback/all");
+  return res.data;
+};
+
+export const getFeedbackStatisticsApi = async (): Promise<any> => {
+  const res = await api.get("/feedback/statistics");
   return res.data;
 };

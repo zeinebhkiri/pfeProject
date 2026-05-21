@@ -13,12 +13,12 @@ public class CompanyDocument {
     @Id
     private String id;
     private String nom;
-    private String type;        // REGLEMENT, MUTUELLE, INFO_ENTREPRISE, SECTEUR, PARTENAIRES, AUTRE
+    private String type;
     private String description;
-    private String contenu;     // base64
+    private String contenu;
     private String mimeType;
-    private long taille;        // taille en bytes
-    private String uploadedBy;  // email admin
+    private long taille;
+    private String uploadedBy;
     private LocalDateTime dateUpload;
     private boolean actif = true;
 }

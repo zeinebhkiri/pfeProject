@@ -19,17 +19,17 @@ public class Task {
     @Id
     private String id;
     private String parcoursId;
-    private String taskTemplateId;
+   // private String taskTemplateId;
 
     private String titre;
     private String description;
     private TaskType taskType;
     private List<TypeActeur> typeActeurs;
-    private List<String> acteurIds;  // userId du manager/RH assigné
+    private List<String> acteurIds;
 
     private int ordre;
     private boolean obligatoire;
-    private boolean verrouille = false; // true pour ENTRETIEN jusqu'à unlock
+    private boolean verrouille = false;
     private String phase;
     private StatutTask statut = StatutTask.NON_COMMENCE;
     private LocalDateTime echeance;
@@ -37,7 +37,7 @@ public class Task {
 
     private int scoreObtenu;
     private int nbTentatives;
-    private int progression; // 0-100
+    private int progression;
 
     // Réponses du salarié au quiz
     private List<Integer> reponsesQuiz;
@@ -56,15 +56,14 @@ public class Task {
     // Config copiée du template
     private TaskTemplate.TaskConfig config;
     // Dans Task.java — nouveaux champs pour l'entretien
-    private String dateEntretien;        // date choisie par le manager
-    private String documentEntretienContenu;  // base64 optionnel
+    private String dateEntretien;
+    private String documentEntretienContenu;
     private String documentEntretienNom;
     private String documentEntretienMimeType;
     public enum StatutTask {
         NON_COMMENCE,
         EN_COURS,
-        TERMINE,
-        REJETE
+        TERMINE
     }
 
     @Data

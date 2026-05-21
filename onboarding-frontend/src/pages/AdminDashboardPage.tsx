@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, use } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { createEmployeeApi, disableUserApi, getAllAffectationsApi, getAllUsersApi, getPositionsApi, validateUserApi } from "../api/authApi";
@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../context/ThemeContext";
 import { type UserRole, type User , type Affectation, type Position} from "../types/auth";
 import Sidebar from "../components/Sidebar";
+import NotificationBell from "../components/NotificationBell";
 
 const statutConfig: Record<string, { label: string; class: string }> = {
   EN_ATTENTE: { label: "En attente", class: "bg-amber-50 text-amber-700 border border-amber-200" },
@@ -27,13 +28,17 @@ const AdminDashboardPage = () => {
   const { isDark, toggleTheme } = useTheme();
   const queryClient = useQueryClient();
 
-  const [dateEmbauche, setDateEmbauche] = useState("");
+  const [dateEmbauche, setDateEmbauche]  = useState(() => {
+  const date = new Date();
+  date.setDate(date.getDate() + 3);
+  return date.toISOString().split("T")[0];
+});
+
   const [showForm, setShowForm] = useState(false);
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
   const [employeeEmail, setEmployeeEmail] = useState("");
   const [role, setRole] = useState<UserRole>("SALARIE");
-  const [joursLimite, setJoursLimite] = useState(3);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -58,7 +63,7 @@ const [userToDisable, setUserToDisable] = useState<User | null>(null);
       setSuccessMessage(message);
       setErrorMessage("");
       setNom(""); setPrenom(""); setEmployeeEmail("");
-      setRole("SALARIE"); setJoursLimite(3);setDateEmbauche("");
+      setRole("SALARIE"); setDateEmbauche("");
       setShowForm(false);
       queryClient.invalidateQueries({ queryKey: ["allUsers"] });
     },
@@ -97,7 +102,8 @@ const disableMutation = useMutation({
     e.preventDefault();
     setSuccessMessage(""); setErrorMessage("");
     createMutation.mutate({
-      nom, prenom, email: employeeEmail, role, joursLimite,
+      nom, prenom, email: employeeEmail, role, 
+      joursLimite:3,
       dateEmbauche: dateEmbauche
     });
   };
@@ -130,7 +136,7 @@ const { data: positions = [] } = useQuery({
     [users]
   );
 
-  const salaries = useMemo(() => employees.filter((u: User) => u.role === "SALARIE"), [employees]);
+  const salaries = useMemo(() => employees.filter((u: User) => u.role === "SALARIE" &&  u.statutCompte === "VALIDE" ), [employees]);
   const managers = useMemo(() => employees.filter((u: User) => u.role === "MANAGER"), [employees]);
 
   const filteredEmployees = useMemo(() => {
@@ -202,7 +208,7 @@ const { data: positions = [] } = useQuery({
               <span className="text-lg leading-none">+</span>
               Ajouter un employé
             </button>
-
+             
             <button
               onClick={toggleTheme}
               className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:scale-105"
@@ -330,7 +336,7 @@ const { data: positions = [] } = useQuery({
       <table className="w-full text-sm">
         <thead>
           <tr style={{ borderBottom: "1px solid var(--border)" }}>
-            {["Employé", "Rôle", "Statut", "Progression", "Délai", "Poste", "Actions"].map((h) => (
+            {["Employé", "Rôle", "Statut", "Progression", "Délai", "💼 Poste", "date 📅d'embauche", "Actions"].map((h) => (
               <th key={h} className="px-6 pb-4 pt-4 text-left text-xs font-semibold uppercase tracking-wide"
                 style={{ color: "var(--text-muted)" }}>
                 {h}
@@ -353,7 +359,10 @@ const { data: positions = [] } = useQuery({
             const userPoste = userAffectation 
               ? positions?.find((p: Position) => p.id === userAffectation.positionId)?.titre 
               : null;
-
+const userdateEmbauche =
+  user.professionalInfo?.dateEmbauche
+    ? new Date(user.professionalInfo.dateEmbauche)
+      : null;
             return (
               <tr key={user.id} className="transition" style={{ borderBottom: "1px solid var(--border)" }}>
                 <td className="px-6 py-4">
@@ -393,26 +402,53 @@ const { data: positions = [] } = useQuery({
                 <td className="px-6 py-4">
                   {joursRestants !== null ? (
                     <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${
-                      joursRestants <= 0 ? "bg-red-50 text-red-500"
+                      joursRestants <= 0 ? "bg-gray-50 text-gray-500"
                       : joursRestants <= 1 ? "bg-orange-50 text-orange-500"
-                      : "bg-slate-100 text-slate-500"}`}>
-                      {joursRestants <= 0 ? "Expiré" : `J-${joursRestants}`}
+                      : "bg-slate-100 text-black-500"}`}>
+                      {joursRestants <= 0 ? "delai Expiré" : `J-${joursRestants}`}
                     </span>
                   ) : <span style={{ color: "var(--text-muted)" }} className="text-xs">—</span>}
                 </td>
                 {/* ⭐ NOUVELLE COLONNE POSTE */}
-                <td className="px-6 py-4">
-                  {userPoste ? (
-                    <span className="text-xs px-2 py-1 rounded-lg font-medium"
-                      style={{ background: "rgba(0,174,239,0.08)", color: "#00AEEF", border: "1px solid rgba(0,174,239,0.15)" }}>
-                      💼 {userPoste}
-                    </span>
-                  ) : (
-                    <span className="text-xs italic" style={{ color: "var(--text-muted)" }}>
-                      Pas d'affectation
-                    </span>
-                  )}
-                </td>
+              <td className="px-4 py-3 whitespace-nowrap">
+  {userPoste ? (
+    <span
+      className="text-[11px] px-2 py-1 rounded-md font-medium truncate inline-block max-w-[120px]"
+      title={userPoste}
+      style={{
+        background: "rgba(0,174,239,0.08)",
+        color: "#00AEEF",
+        border: "1px solid rgba(0,174,239,0.15)"
+      }}
+    >
+       {userPoste}
+    </span>
+  ) : (
+    <span className="text-[11px] italic whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+      Pas d'affectation
+    </span>
+  )}
+</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+  {userdateEmbauche ? (
+    <span
+      className="text-[11px] font-medium px-2 py-0.5 rounded-md"
+      style={{
+        background: "rgba(16,185,129,0.08)",
+        color: "#059669"
+      }}
+    >
+      {userdateEmbauche.toLocaleDateString("fr-FR")}
+    </span>
+  ) : (
+    <span
+      className="text-[11px] italic"
+      style={{ color: "var(--text-muted)" }}
+    >
+      —
+    </span>
+  )}
+</td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     <button
@@ -423,7 +459,7 @@ const { data: positions = [] } = useQuery({
                     </button>
                     {canValidate && (
                       <button
-                        onClick={() => validateMutation.mutate(user.id)}
+                        onClick={() => setToast({ nom: user.nom, prenom: user.prenom, userId: user.id })}
                         disabled={validateMutation.isPending}
                         className="text-xs px-3 py-2 rounded-xl font-semibold transition"
                         style={{ background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" }}
@@ -432,7 +468,7 @@ const { data: positions = [] } = useQuery({
                       </button>
                     )}
                     {/* Bouton désactiver - visible pour les comptes actifs (non déjà désactivés) */}
-                    {user.statutCompte !== "DESACTIVE" && user.statutCompte !== "EXPIRE" && (
+                    {user.statutCompte == "VALIDE" &&  (
                       <button
                         onClick={() => {
                           setUserToDisable(user);
@@ -577,13 +613,15 @@ const { data: positions = [] } = useQuery({
         <option value="MANAGER">Manager</option>
       </select>
     </div>
-    <div>
-      <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Délai (jours)</label>
-      <input type="number" value={joursLimite} onChange={(e) => setJoursLimite(Number(e.target.value))} min={1} max={30} required className="input-field" />
-    </div>
-    <div>
+   <div>
+  <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Délai de completion</label>
+  <div className="px-4 py-2 rounded-xl text-sm" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+     3 jours 
+  </div>
+</div>
+<div>
       <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>
-        Date d'embauche <span className="text-red-400">*</span>
+        Date d'embauche <span className="text-red-400"></span>
       </label>
       <input
         type="date"
@@ -591,7 +629,11 @@ const { data: positions = [] } = useQuery({
         onChange={(e) => setDateEmbauche(e.target.value)}
         required
         className="input-field"
-        min={new Date().toISOString().split("T")[0]}
+          min={(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 3);
+    return date.toISOString().split("T")[0];
+  })()}
       />
     </div>
   </div>
@@ -630,13 +672,13 @@ const { data: positions = [] } = useQuery({
             </div>
 
             <h2 className="text-2xl font-bold mb-2" style={{ color: "var(--text)", fontFamily: "Sora" }}>
-              Compte validé !
+                Vérification avant validation
             </h2>
             <p className="text-base font-semibold mb-1" style={{ color: "#059669" }}>
               {toast.prenom} {toast.nom}
             </p>
             <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
-              Le compte a été validé avec succès.
+              Veuillez vérifier les coordonnées avant de valider définitivement ce compte.
             </p>
 
             {/* Alerte affectation */}
@@ -660,19 +702,25 @@ const { data: positions = [] } = useQuery({
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  setToast(null);
-                  navigate(`/admin/salarie/${toast.userId}`);
-                }}
+  validateMutation.mutate(toast.userId, {
+    onSuccess: () => {
+      setToast(null);
+     navigate(`/admin/salarie/${toast.userId}`, {
+  state: { scrollTo: "affectation-section" }
+});
+    }
+  });
+}}
                 className="btn-primary flex-1 py-3"
               >
-                📌 Affecter maintenant →
+                ✅ Valider et passer à l'affectation maintenant →
               </button>
-              <button
-                onClick={() => setToast(null)}
-                className="btn-secondary px-6 py-3"
-              >
-                Plus tard
-              </button>
+             <button
+  onClick={() => navigate(`/admin/salarie/${toast.userId}`)}
+  className="btn-secondary px-6 py-3"
+>
+  👁 Vérifier le profil
+</button>
             </div>
           </div>
         </div>

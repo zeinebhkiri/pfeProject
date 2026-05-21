@@ -11,7 +11,22 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-
+    const validateForm = () => {
+    // Validation email
+    const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setErrorMessage("Veuillez entrer une adresse email valide.");
+      return false;
+    }
+    
+    // Validation mot de passe
+    if (password.length < 8) {
+      setErrorMessage("Le mot de passe doit contenir au moins 8 caractères.");
+      return false;
+    }
+    
+    return true;
+  };
   const loginMutation = useMutation({
     mutationFn: loginApi,
     onSuccess: (data) => {
@@ -28,6 +43,9 @@ const LoginPage = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
+    
+    if (!validateForm()) return; // ← AJOUTEZ CETTE LIGNE
+    
     loginMutation.mutate({ email, password });
   };
 

@@ -14,6 +14,6 @@ public class ParcoursTemplate {
     private String id;
     private String titre;
     private String description;
-    private String positionId; // 1 position = 1 parcours template
+    private String positionId;
     private boolean actif = true;
 }

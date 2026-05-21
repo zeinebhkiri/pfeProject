@@ -25,6 +25,13 @@ import AdminParcoursTemplatesPage from "./pages/AdminParcoursTemplatesPage";
 import MonParcoursPage from "./pages/MonParcoursPage";
 import ManagerParcoursPage from "./pages/ManagerParcoursPage";
 import AdminParcoursPage from "./pages/AdminParcoursPage";
+import AdminParcoursArchivesPage from "./pages/AdminParcoursArchivesPage";
+import AnciensCollaborateursPage from "./pages/AnciensCollaborateursPage";
+import AdminParcoursTemplatesArchivesPage from "./pages/AdminParcoursTemplatesArchivesPage";
+import AdminPostesArchivesPage from "./pages/AdminPostesArchivesPage";
+import EquipePage from "./pages/EquipePage";
+import FeedbackFormPage from "./pages/FeedbackFormPage";
+import LeaderboardPage from "./pages/LeaderboardPage";
 const queryClient = new QueryClient();
 
 function App() {
@@ -37,12 +44,15 @@ function App() {
           <Route path="/activate-account" element={<ActivateAccountPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
-
+           <Route path="/equipe" element={<ProtectedRoute><EquipePage /></ProtectedRoute>} />
+           
           {/* Salarié */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilPage /></ProtectedRoute>} />
           <Route path="/parcours" element={<ProtectedRoute><MonParcoursPage /></ProtectedRoute>} />
-
+          <Route path="/feedback" element={<ProtectedRoute><FeedbackFormPage /></ProtectedRoute>} />
+         
+          
           {/* Admin */}
           <Route path="/admin" element={<ProtectedAdminRoute><AdminDashboardPage /></ProtectedAdminRoute>} />
           <Route path="/admin/salaries" element={<ProtectedAdminRoute><SalariesPage /></ProtectedAdminRoute>} />
@@ -54,18 +64,23 @@ function App() {
           <Route path="/admin/postes" element={<ProtectedAdminRoute><AdminPostesPage /></ProtectedAdminRoute>} />
           <Route path="/admin/parcours" element={<ProtectedAdminRoute><AdminParcoursTemplatesPage /></ProtectedAdminRoute>} />
           <Route path="/admin/suivi-parcours" element={<ProtectedAdminRoute><AdminParcoursPage /></ProtectedAdminRoute>} />
-
+          <Route path="/admin/archives/parcours-termines" element={<ProtectedAdminRoute><AdminParcoursArchivesPage /></ProtectedAdminRoute>} />
+          <Route path="/admin/archives/anciens" element={<ProtectedAdminRoute><AnciensCollaborateursPage /></ProtectedAdminRoute>} />
+          <Route path="/admin/archives/parcours-templates" element={<ProtectedAdminRoute><AdminParcoursTemplatesArchivesPage /></ProtectedAdminRoute>} />
+          <Route path="/admin/archives/postes" element={<ProtectedAdminRoute><AdminPostesArchivesPage /></ProtectedAdminRoute>} />
           {/* Manager */}
           <Route path="/manager" element={<ProtectedManagerRoute><ManagerDashboardPage /></ProtectedManagerRoute>} />
           <Route path="/manager/equipe" element={<ProtectedManagerRoute><ManagerSalariesPage /></ProtectedManagerRoute>} />
           <Route path="/manager/analytics" element={<ProtectedManagerRoute><ManagerAnalyticsPage /></ProtectedManagerRoute>} />
           <Route path="/manager/salarie/:id" element={<ProtectedManagerRoute><ManagerSalarieProfilePage /></ProtectedManagerRoute>} />
           <Route path="/manager/parcours" element={<ProtectedManagerRoute><ManagerParcoursPage /></ProtectedManagerRoute>} />
+          <Route path="/manager/leaderboard" element={<ProtectedManagerRoute><LeaderboardPage /></ProtectedManagerRoute>} />
           
 
           {/* Redirections */}
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
+          
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

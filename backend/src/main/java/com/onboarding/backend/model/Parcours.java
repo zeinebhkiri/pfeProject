@@ -16,7 +16,7 @@ public class Parcours {
     private String id;
     private String userId;
     private String positionId;
-    private String parcoursTemplateId;
+    /*private String parcoursTemplateId;*/
 
     private StatutParcours statut = StatutParcours.EN_COURS;
     private LocalDateTime dateDebut;
