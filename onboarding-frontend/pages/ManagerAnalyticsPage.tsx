@@ -8,7 +8,7 @@ import {
   getAllFeedbacksApi,
 } from "../api/authApi";
 import { type User, type Parcours, type Task } from "../types/auth";
-import Sidebar from "../components/Sidebar";
+import Sidebar, { MobileNav } from "../components/Sidebar";
 import TopNav from "../components/TopNav";
 
 // ─── utils ────────────────────────────────────────────────────────────────────
@@ -1008,6 +1008,7 @@ const ManagerAnalyticsPage = () => {
           </div>
         )}
       </main>
+      <MobileNav role={role as any} />
     </div>
   );
 };

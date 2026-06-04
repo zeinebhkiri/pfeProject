@@ -1,4 +1,3 @@
-// src/api/AuthApi.ts
 import axios from "axios";
 import {
   type LoginRequest,

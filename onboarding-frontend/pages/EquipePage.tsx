@@ -8,7 +8,7 @@ import {
   getCurrentUserApi,
 } from "../api/authApi";
 import { useAuth } from "../hooks/useAuth";
-import Sidebar from "../components/Sidebar";
+import Sidebar, { MobileNav } from "../components/Sidebar";
 import TopNav from "../components/TopNav";
 import type { User, Affectation, Position } from "../types/auth";
 
@@ -971,7 +971,7 @@ const EquipePage = () => {
           onClose={() => setSelected(null)}
         />
       )}
-    
+      <MobileNav role={{role as any}} />
     </div>
   );
 };

@@ -13,7 +13,7 @@ import {
 
 } from "../api/authApi";
 import { useAuth } from "../hooks/useAuth";
-import Sidebar from "../components/Sidebar";
+import Sidebar, { MobileNav } from "../components/Sidebar";
 import { type Task, type TaskType, type User, type Parcours, type StatutTask } from "../types/auth";
 
 // ── Configs visuelles ──────────────────────────────────────────────────
@@ -1320,6 +1320,7 @@ const confirmUnlockQuiz = () => {
     </div>
   </div>
 )}
+      <MobileNav role={{role as any}} />
     </div>
   );
   

@@ -46,10 +46,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/forgot-password").permitAll()
                         .requestMatchers("/api/auth/reset-password").permitAll()
 
+                        // ── Route proxy IA — utilisateurs connectés ──
+                        .requestMatchers("/api/ai/**").authenticated()
+
 
                         // ── Routes ADMIN (RH) uniquement ───────────────────────────────
                         .requestMatchers("/api/auth/create-employee").hasRole("ADMIN")
-                        //.requestMatchers("/api/users").hasRole("ADMIN")
+                        .requestMatchers("/api/users").authenticated()
 
                         // ── Routes MANAGER + ADMIN ──────────────────────────────────────
                         .requestMatchers("/api/manager/**").hasAnyRole("MANAGER", "ADMIN")
@@ -79,12 +82,18 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // Allow requests from React frontend
+    // Allow requests from React frontend (localhost + local network for mobile dev)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:5173",
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "http://192.168.*.*:*",
+                "http://10.*.*.*:*"
+        ));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 

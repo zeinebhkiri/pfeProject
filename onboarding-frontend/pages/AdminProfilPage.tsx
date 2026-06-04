@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentUserApi, updateMyProfileApi, getAllUsersApi } from "../api/authApi";
 import { type User } from "../types/auth";
-import Sidebar from "../components/Sidebar";
+import Sidebar, { MobileNav } from "../components/Sidebar";
 import TopNav from "../components/TopNav";
 
 const AdminProfilPage = () => {
@@ -14,7 +14,6 @@ const AdminProfilPage = () => {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [photoUrl, setPhotoUrl] = useState("");
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -536,150 +535,103 @@ style={{ borderColor: "rgba(0,174,239,0.2)", borderTopColor: "#00AEEF" }} />
 
             {/* Aperçu */}
             <div className="flex justify-center mb-6">
-              {(photoUrl || photoPreview) ? (
+              {photoUrl ? (
                 <img
-                  src={photoUrl || photoPreview!}
+                  src={photoUrl}
                   alt="Aperçu"
                   className="w-24 h-24 rounded-2xl object-cover shadow-md"
-                  style={{ border: "3px solid rgba(0,174,239,0.3)" }}
-                  onError={() => setPhotoPreview(null)}
+                  onError={() => {}}
+                />
+              ) : photoPreview ? (
+                <img
+                  src={photoPreview}
+                  alt="Aperçu actuel"
+                  className="w-24 h-24 rounded-2xl object-cover shadow-md"
                 />
               ) : (
                 <div
-                  className="w-24 h-24 rounded-2xl flex flex-col items-center justify-center gap-1"
-                  style={{ background: "var(--bg)", border: "2px dashed var(--border)" }}
+                  className="w-24 h-24 rounded-2xl flex items-center justify-center text-4xl font-bold"
+                  style={{
+                    background: "var(--bg)",
+                    border: "2px dashed var(--border)",
+                    color: "var(--text-muted)",
+                    fontFamily: "Sora",
+                  }}
                 >
-                  <span className="text-3xl font-bold" style={{ color: "var(--text-muted)", fontFamily: "Sora" }}>{initials}</span>
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>Aperçu</span>
+                  {initials}
                 </div>
               )}
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold mb-2 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                  Option 1 — Lien URL
+                <label
+                  className="block text-xs font-bold mb-2 uppercase tracking-wide"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Lien de l'image (URL)
                 </label>
                 <input
                   type="url"
                   value={photoUrl}
-                  onChange={(e) => { setPhotoUrl(e.target.value); setPhotoFile(null); }}
+                  onChange={(e) => setPhotoUrl(e.target.value)}
                   placeholder="https://exemple.com/photo.jpg"
                   className="input-field"
                 />
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-                <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>OU</span>
-                <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold mb-2 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                  Option 2 — Importer un fichier
-                </label>
-                <label className="flex items-center justify-center gap-3 w-full py-3 rounded-xl cursor-pointer transition hover:scale-[1.01]"
-                  style={{ background: "var(--bg)", border: "2px dashed var(--border)" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00AEEF" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
-                  <span className="text-sm font-medium" style={{ color: "#00AEEF" }}>
-                    {photoFile ? photoFile.name : "Choisir une image..."}
-                  </span>
-                  <input type="file" accept="image/*" className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      setPhotoFile(file);
-                      setPhotoUrl("");
-                      const reader = new FileReader();
-                      reader.onloadend = () => setPhotoPreview(reader.result as string);
-                      reader.readAsDataURL(file);
-                    }} />
-                </label>
-                <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>JPG, PNG, WEBP — Depuis votre appareil</p>
+                <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>
+                  Collez un lien direct vers une image (jpg, png, webp...)
+                </p>
               </div>
 
               <div className="flex gap-3 pt-2">
                 <button
-                  onClick={async () => {
-                    let photoToSave = photoUrl.trim();
-                    if (!photoToSave && photoFile) {
-                      photoToSave = await new Promise<string>((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result as string);
-                        reader.readAsDataURL(photoFile);
-                      });
-                    }
-                    if (!photoToSave) return;
-                    setPhotoPreview(photoToSave);
-                    try {
-                      await updateMyProfileApi({
-                        adresse: adminUser?.profile?.adresse || "",
-                        rib: adminUser?.profile?.rib || "",
-                        telephone: adminUser?.profile?.telephone || "",
-                        image: photoToSave,
-                        numeroCnss: adminUser?.profile?.numeroCnss || "",
-                        dateNaissance: adminUser?.profile?.dateNaissance || "",
-                        lieuNaissance: adminUser?.profile?.lieuNaissance || "",
-                        nomBanque: adminUser?.profile?.nomBanque || "",
-                        statutSocial: adminUser?.profile?.statutSocial || "",
-                        nationalite: adminUser?.profile?.nationalite || "",
-                        genre: adminUser?.profile?.genre || "",
-                      });
-                      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
-                      setSuccessMsg("Photo de profil mise à jour !");
-                    } catch {
-                      setErrorMsg("Erreur lors de la sauvegarde de la photo.");
-                    }
-                    setShowPhotoModal(false);
-                    setPhotoUrl("");
-                    setPhotoFile(null);
-                  }}
-                  disabled={!photoUrl.trim() && !photoFile}
+                 onClick={async () => {
+  if (photoUrl.trim()) {
+    setPhotoPreview(photoUrl.trim());
+    // Sauvegarder immédiatement en base
+    try {
+      await updateMyProfileApi({
+        adresse: adminUser?.profile?.adresse || "",
+        rib: adminUser?.profile?.rib || "",
+        telephone: adminUser?.profile?.telephone || "",
+        image: photoUrl.trim(),
+        numeroCnss: adminUser?.profile?.numeroCnss || "",
+        dateNaissance: adminUser?.profile?.dateNaissance || "",
+        lieuNaissance: adminUser?.profile?.lieuNaissance || "",
+        nomBanque: adminUser?.profile?.nomBanque || "",
+        statutSocial: adminUser?.profile?.statutSocial || "",
+        nationalite: adminUser?.profile?.nationalite || "",
+        genre: adminUser?.profile?.genre || "",});
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+      setSuccessMsg("Photo de profil mise à jour !");
+    } catch {
+      setErrorMsg("Erreur lors de la sauvegarde de la photo.");
+    }
+  }
+  setShowPhotoModal(false);
+  setPhotoUrl("");
+}}
+                  disabled={!photoUrl.trim()}
                   className="btn-primary flex-1 py-2.5"
                 >
-                  ✓ Enregistrer la photo
+                  ✓ Appliquer
                 </button>
                 <button
-                  onClick={async () => {
+                  onClick={() => {
                     setPhotoPreview(null);
                     setPhotoUrl("");
-                    setPhotoFile(null);
-                    try {
-                      await updateMyProfileApi({
-                        adresse: adminUser?.profile?.adresse || "",
-                        rib: adminUser?.profile?.rib || "",
-                        telephone: adminUser?.profile?.telephone || "",
-                        image: "",
-                        numeroCnss: adminUser?.profile?.numeroCnss || "",
-                        dateNaissance: adminUser?.profile?.dateNaissance || "",
-                        lieuNaissance: adminUser?.profile?.lieuNaissance || "",
-                        nomBanque: adminUser?.profile?.nomBanque || "",
-                        statutSocial: adminUser?.profile?.statutSocial || "",
-                        nationalite: adminUser?.profile?.nationalite || "",
-                        genre: adminUser?.profile?.genre || "",
-                      });
-                      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
-                      setSuccessMsg("Photo supprimée !");
-                    } catch {
-                      setErrorMsg("Erreur lors de la suppression.");
-                    }
                     setShowPhotoModal(false);
                   }}
                   className="btn-danger py-2.5 px-5"
-                  title="Supprimer la photo"
                 >
-                  🗑
+                  Supprimer
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+      <MobileNav role={{role as any}} />
     </div>
   );
 };

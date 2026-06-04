@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUserApi, updateMyProfileApi, getAffectationByUserApi, getPositionsApi, getMyManagerApi, getMyParcoursApi, getMyTasksApi } from "../api/authApi";
+import { getCurrentUserApi, updateMyProfileApi, getAffectationByUserApi, getPositionsApi, getMyManagerApi } from "../api/authApi";
 import { useAuth } from "../hooks/useAuth";
-import Sidebar from "../components/Sidebar";
-import type { StatutCompte, UserProfile, UserRole , ProfessionalInfo, Position, Parcours, Task} from "../types/auth";
+import Sidebar, { MobileNav } from "../components/Sidebar";
+import type { StatutCompte, UserProfile, UserRole , ProfessionalInfo, Position} from "../types/auth";
 import DocumentsSection from "../components/DocumentsSection";
-import BadgesWidget from "../components/BadgesWidget";
 
 const statutConfig: Record<string, { label: string; class: string; icon: string }> = {
   EN_ATTENTE: { label: "En attente d'activation", class: "bg-amber-50 text-amber-700 border border-amber-200", icon: "⏳" },
@@ -80,17 +79,6 @@ const [sensitiveFieldsLocked, setSensitiveFieldsLocked] = useState({
   const { data: positions = [] } = useQuery({
   queryKey: ["positions"],
   queryFn: getPositionsApi,
-});
-
-const { data: myTasks = [] } = useQuery<Task[]>({
-  queryKey: ["myTasks"],
-  queryFn: getMyTasksApi,
-  retry: false,
-});
-const { data: myParcours } = useQuery<Parcours>({
-  queryKey: ["myParcours"],
-  queryFn: getMyParcoursApi,
-  retry: false,
 });
 
   useEffect(() => {
@@ -702,10 +690,7 @@ const validateAge = (dateNaissance: string): boolean => {
               )}
             </div>
           </div>
-{/* ── Gamification / Badges ── */}
-          {(myTasks.length > 0 || myParcours) && (
-            <BadgesWidget tasks={myTasks} parcours={myParcours} />
-          )}
+
           {/* ── Documents ── */}
           <DocumentsSection
             documents={user?.profile?.documents ?? []}
@@ -750,11 +735,8 @@ const validateAge = (dateNaissance: string): boolean => {
             </div>
         
             <div>
-              <label className="text-sm text-gray-500 flex items-center gap-1">
-                Date d'embauche
-                <span title="Non modifiable" className="text-xs text-gray-400 ml-1">🔒</span>
-              </label>
-              <p className="font-medium text-gray-700">
+              <label className="text-sm text-gray-500">Date d'embauche</label>
+              <p className="font-medium">
                 {user?.professionalInfo?.dateEmbauche || "-"}
               </p>
             </div>
@@ -859,34 +841,13 @@ const validateAge = (dateNaissance: string): boolean => {
                   ✓ Enregistrer la photo
                 </button>
                 <button type="button"
-                  onClick={async () => {
+                  onClick={() => {
                     setPhotoPostePreview(null);
                     setPhotoPosteUrl("");
                     setPhotoPosteFile(null);
-                    try {
-                      await updateMyProfileApi({
-                        adresse: user?.profile?.adresse || "",
-                        rib: user?.profile?.rib || "",
-                        telephone: user?.profile?.telephone || "",
-                        image: user?.profile?.image || "",
-                        numeroCnss: user?.profile?.numeroCnss || "",
-                        dateNaissance: user?.profile?.dateNaissance || "",
-                        lieuNaissance: user?.profile?.lieuNaissance || "",
-                        nomBanque: user?.profile?.nomBanque || "",
-                        statutSocial: user?.profile?.statutSocial || "",
-                        nationalite: user?.profile?.nationalite || "",
-                        genre: user?.profile?.genre || "",
-                        photoPoste: "",
-                      });
-                      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
-                      setPhotoPosteSuccess("Photo du poste supprimée !");
-                    } catch {
-                      setErrorMsg("Erreur lors de la suppression.");
-                    }
                     setShowPhotoPosteModal(false);
                   }}
-                  className="btn-danger py-3 px-5"
-                  title="Supprimer la photo">
+                  className="btn-danger py-3 px-5">
                   🗑
                 </button>
               </div>
@@ -894,6 +855,7 @@ const validateAge = (dateNaissance: string): boolean => {
           </div>
         </div>
       )}
+      <MobileNav role={{role as any}} />
     </div>
   );
 };

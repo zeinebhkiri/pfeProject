@@ -14,7 +14,7 @@ import {
   updateProfessionalInfoApi,
 } from "../api/authApi";
 import { type User, type Position } from "../types/auth";
-import Sidebar from "../components/Sidebar";
+import Sidebar, { MobileNav } from "../components/Sidebar";
 import { useAuth } from "../hooks/useAuth";
 import DocumentsReadOnly from "../components/DocumentsReadOnly";
 
@@ -222,6 +222,7 @@ const SalarieProfilePage = () => {
     setIsDatePrisePostePersonnalisee(isPersonnalisee);
 
     console.log("Soumission formulaire:", {
+      dateEmbauche: professionalHireDate,
       datePriseDePoste: datePriseDePoste,
       personnalisee: isPersonnalisee
     });
@@ -229,7 +230,7 @@ const SalarieProfilePage = () => {
     professionalMutation.mutate({
       emailProfessionnel: professionalEmail,
       telephoneProfessionnel: professionalPhone,
-      // dateEmbauche: non modifiable, gérée par les RH
+      dateEmbauche: professionalHireDate,
       datePriseDePoste: datePriseDePoste,
     });
   };
@@ -610,21 +611,16 @@ const SalarieProfilePage = () => {
                             className="input-field" />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide flex items-center gap-1"
+                          <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide"
                             style={{ color: "var(--text-muted)" }}>
                             Date d'embauche
-                            <span title="Non modifiable" style={{ fontSize: "11px", opacity: 0.6 }}>🔒</span>
                           </label>
-                          <div className="input-field flex items-center gap-2" style={{ background: "var(--bg, #f8fafc)", cursor: "not-allowed", opacity: 0.75 }}>
-                            <span style={{ fontSize: "13px", color: "var(--text, #1e293b)" }}>
-                              {professionalHireDate
-                                ? new Date(professionalHireDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
-                                : <span style={{ color: "var(--text-muted)" }}>—</span>}
-                            </span>
-                          </div>
-                          <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                            🔒 Cette date est définie par l' RH et ne peut pas être modifiée.
-                          </p>
+                          <input
+                            type="date"
+                            value={professionalHireDate}
+                            onChange={(e) => setProfessionalHireDate(e.target.value)}
+                            className="input-field"
+                          />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide"
@@ -970,6 +966,7 @@ const SalarieProfilePage = () => {
           </div>
         </div>
       )}
+      <MobileNav role={{role as any}} />
     </div>
   );
 };

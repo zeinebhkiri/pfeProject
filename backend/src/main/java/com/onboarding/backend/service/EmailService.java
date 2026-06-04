@@ -68,7 +68,6 @@ public class EmailService {
             corps = "Bonjour " + prenomNom + ",\n\n" +
                     "Félicitations ! Votre compte OnboardPro a été validé.\n\n" +
                     "📋 Votre poste : " + poste + "\n\n" +
-                    "👔 Votre manager : " + (managerNom != null ? managerNom : "À définir") + "\n\n" +
                     "Vous avez un rôle de Manager. Vous serez superviseur d'une équipe.\n\n" +
                     "Bienvenue dans l'équipe !\n\n" +
                     "Cordialement,\nL'équipe RH — OnboardPro";

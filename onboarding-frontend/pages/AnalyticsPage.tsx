@@ -7,10 +7,9 @@ import {
   getParcoursTerminesApi,
   getFeedbackStatisticsApi,
   getAllFeedbacksApi,
-  getAllAffectationsApi, 
 } from "../api/authApi";
 import { type User, type Parcours, type Position, type Task } from "../types/auth";
-import Sidebar from "../components/Sidebar";
+import Sidebar, { MobileNav } from "../components/Sidebar";
 import TopNav from "../components/TopNav";
 
 // ─── utils ───────────────────────────────────────────────────────────────────
@@ -54,7 +53,6 @@ function useCountUp(target: number, duration = 900) {
   }, [target, duration]);
   return val;
 }
-
 
 // ─── AnimatedNumber ───────────────────────────────────────────────────────────
 const AnimatedNumber = ({ value, suffix = "" }: { value: number; suffix?: string }) => {
@@ -400,10 +398,7 @@ const AnalyticsPage = () => {
   const { data: terminesRaw = [], isLoading: loadingTermines } = useQuery({ queryKey: ["parcoursTermines"], queryFn: getParcoursTerminesApi });
   const { data: feedbackStats } = useQuery({ queryKey: ["feedbackStatistics"], queryFn: getFeedbackStatisticsApi });
   const { data: allFeedbacks = [] } = useQuery({ queryKey: ["allFeedbacks"], queryFn: getAllFeedbacksApi });
-  const { data: allAffectations = [] } = useQuery({
-  queryKey: ["allAffectations"],
-  queryFn: getAllAffectationsApi,
-});
+
   const loading = loadingUsers || loadingParcours || loadingTermines;
 
   // ── Collaborateurs actifs (pas ADMIN, DESACTIVE, EXPIRE) ─────────────────
@@ -562,42 +557,33 @@ const AnalyticsPage = () => {
       };
     }).sort((a, b) => {
       // Bloqués en premier, puis à risque, puis ok — et par progression décroissante
-      const order: Record<"bloque" | "risque" | "ok", number> = { bloque: 0, risque: 1, ok: 2 };
-      const aOrder = order[a.statut as keyof typeof order];
-      const bOrder = order[b.statut as keyof typeof order];
-      if (aOrder !== bOrder) return aOrder - bOrder;
+      const order = { bloque: 0, risque: 1, ok: 2 };
+      if (order[a.statut] !== order[b.statut]) return order[a.statut] - order[b.statut];
       return b.progression - a.progression;
     });
   }, [parcoursActifs, collaborateursActifs, posMap]);
 
   // ── Meilleurs managers ────────────────────────────────────────────────────
   const meilleursManagers = useMemo(() => {
-  const managers = (users as User[]).filter((u) => u.role === "MANAGER");
-  const affectations = allAffectations as { userId: string; managerId: string }[];
-
-  return managers.map((mgr) => {
-    // Trouver les salariés via Affectation.managerId
-    const teamUserIds = new Set(
-      affectations
-        .filter((a) => a.managerId === mgr.id)
-        .map((a) => a.userId)
-    );
-    const teamMembers = (users as User[]).filter((u) => teamUserIds.has(u.id));
-    const teamParcours = (allParcours as Parcours[]).filter((p) => teamUserIds.has(p.userId));
-    const total = teamParcours.length;
-    const terminesEnTemps = teamParcours.filter((p) => {
-      if (p.statut !== "TERMINE" || !p.dateFin) return false;
-      return daysBetween(p.dateDebut, p.dateFin) <= 30;
-    }).length;
-    const taux = total > 0 ? Math.round((terminesEnTemps / total) * 100) : 0;
-    const progMoy = total > 0
-      ? Math.round(teamParcours.reduce((a, p) => a + (p.progression ?? 0), 0) / total)
-      : 0;
-    return { mgr, total, terminesEnTemps, taux, progMoy, teamSize: teamMembers.length };
-  })
-  .filter((m) => m.teamSize > 0)
-  .sort((a, b) => b.taux - a.taux || b.progMoy - a.progMoy);
-}, [users, allParcours, allAffectations]);
+    const managers = (users as User[]).filter((u) => u.role === "MANAGER");
+    return managers.map((mgr) => {
+      const teamMembers = (users as User[]).filter((u) => u.managerId === mgr.id);
+      const teamIds = new Set(teamMembers.map((u) => u.id));
+      const teamParcours = parcoursActifs.filter((p) => teamIds.has(p.userId));
+      const total = teamParcours.length;
+      const terminesEnTemps = teamParcours.filter((p) => {
+        if (p.statut !== "TERMINE" || !p.dateFin) return false;
+        return daysBetween(p.dateDebut, p.dateFin) <= 30;
+      }).length;
+      const taux = total > 0 ? Math.round((terminesEnTemps / total) * 100) : 0;
+      const progMoy = teamParcours.length
+        ? Math.round(teamParcours.reduce((a, p) => a + (p.progression ?? 0), 0) / teamParcours.length)
+        : 0;
+      return { mgr, total, terminesEnTemps, taux, progMoy, teamSize: teamMembers.length };
+    })
+    .filter((m) => m.total > 0)
+    .sort((a, b) => b.taux - a.taux || b.progMoy - a.progMoy);
+  }, [users, parcoursActifs]);
 
   if (loading) {
     return (
@@ -1650,6 +1636,7 @@ const AnalyticsPage = () => {
           <div className="h-8" />
         </div>
       </main>
+      <MobileNav role={role as any} />
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import OnboardingAssistant from "./components/OnboardingAssistant";
 import LoginPage from "./pages/LoginPage";
 import ActivateAccountPage from "./pages/ActivateAccountPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -83,6 +84,7 @@ function App() {
           
         </Routes>
       </BrowserRouter>
+      <OnboardingAssistant />
     </QueryClientProvider>
   );
 }

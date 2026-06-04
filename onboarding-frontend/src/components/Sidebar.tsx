@@ -291,7 +291,7 @@ const managerLinks = [
       </svg>
     ),
   },
-   {
+  {
   label: "🏆 Classement",
   to: "/manager/leaderboard",
   icon: (
@@ -302,7 +302,6 @@ const managerLinks = [
     </svg>
   ),
 },
-
 ];
 
 /* ── Logo Square IT ── */
@@ -344,7 +343,7 @@ const Sidebar = ({ role }: SidebarProps) => {
 
   return (
     <aside
-      className="fixed top-0 left-0 h-screen flex flex-col transition-all duration-300 z-40"
+      className="fixed top-0 left-0 h-screen flex-col transition-all duration-300 z-40 hidden md:flex"
       style={{
         width: w,
         background: "linear-gradient(180deg, #0D1B3E 0%, #1A2B6B 60%, #111D4A 100%)",
@@ -463,5 +462,4 @@ const Sidebar = ({ role }: SidebarProps) => {
     </aside>
   );
 };
-
 export default Sidebar;

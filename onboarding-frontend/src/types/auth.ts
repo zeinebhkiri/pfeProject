@@ -68,6 +68,7 @@ export interface UserProfile {
 }
 
 export interface User {
+  managerId: string;
   id: string;
   nom: string;
   prenom: string;
