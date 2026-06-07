@@ -124,8 +124,17 @@ const AdminParcoursPage = () => {
       setValidateComment("");
       setSuccessMsg(validateApprouve ? "Tâche validée !" : "Tâche rejetée.");
       queryClient.invalidateQueries({ queryKey: ["assignedTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["allParcours"] });
+      // Mettre à jour parcoursData local ET recharger depuis le backend
       if (parcoursData) {
-        setParcoursData({ ...parcoursData, tasks: parcoursData.tasks.map(t => t.id === updatedTask.id ? updatedTask : t) });
+        const updatedTasks = parcoursData.tasks.map(t => t.id === updatedTask.id ? updatedTask : t);
+        const doneCount = updatedTasks.filter(t => t.statut === "TERMINE").length;
+        const newProgression = updatedTasks.length > 0 ? Math.round((doneCount / updatedTasks.length) * 100) : 0;
+        setParcoursData({
+          ...parcoursData,
+          parcours: { ...parcoursData.parcours, progression: newProgression },
+          tasks: updatedTasks,
+        });
       }
     },
     onError: (e: any) => setErrorMsg(e.response?.data?.error || "Erreur validation."),
@@ -139,8 +148,17 @@ const AdminParcoursPage = () => {
       setEntretienDate(""); setEntretienFile(null);
       setSuccessMsg("Entretien planifié !");
       queryClient.invalidateQueries({ queryKey: ["assignedTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["allParcours"] });
+      // Mettre à jour parcoursData local ET recharger depuis le backend
       if (parcoursData) {
-        setParcoursData({ ...parcoursData, tasks: parcoursData.tasks.map(t => t.id === updatedTask.id ? updatedTask : t) });
+        const updatedTasks = parcoursData.tasks.map(t => t.id === updatedTask.id ? updatedTask : t);
+        const doneCount = updatedTasks.filter(t => t.statut === "TERMINE").length;
+        const newProgression = updatedTasks.length > 0 ? Math.round((doneCount / updatedTasks.length) * 100) : 0;
+        setParcoursData({
+          ...parcoursData,
+          parcours: { ...parcoursData.parcours, progression: newProgression },
+          tasks: updatedTasks,
+        });
       }
     },
     onError: (e: any) => setErrorMsg(e.response?.data?.error || "Erreur planification."),

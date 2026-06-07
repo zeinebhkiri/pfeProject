@@ -86,6 +86,7 @@ const ManagerSalariesPage = () => {
                 <p className="text-sm" style={{ color: "var(--text-muted)" }}>Aucun résultat trouvé.</p>
               </div>
             ) : (
+              <div className="table-responsive"> 
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -139,6 +140,7 @@ const ManagerSalariesPage = () => {
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>

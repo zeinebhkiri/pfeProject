@@ -87,7 +87,7 @@ const LoginPage = () => {
           </div>
           <div>
             <p className="text-white font-bold text-xl leading-tight" style={{ fontFamily: "Sora" }}>
-              SQUARE <span style={{ color: "#00AEEF" }}>IT</span>
+              Onboard <span style={{ color: "#00AEEF" }}>Pro</span>
             </p>
             <p className="text-xs font-semibold tracking-widest" style={{ color: "rgba(168,216,234,0.55)" }}>
               CONSULTING
@@ -135,7 +135,7 @@ const LoginPage = () => {
         </div>
 
         <p className="relative text-xs" style={{ color: "rgba(168,216,234,0.3)" }}>
-          © 2025 Square IT Consulting — Tous droits réservés
+          © 2026 Square IT Consulting — Tous droits réservés
         </p>
       </div>
 
@@ -153,7 +153,7 @@ const LoginPage = () => {
             </svg>
             <div>
               <p className="font-bold text-base" style={{ color: "#1A2B6B", fontFamily: "Sora" }}>
-                SQUARE <span style={{ color: "#00AEEF" }}>IT</span>
+                Onboard <span style={{ color: "#00AEEF" }}>Pro</span>
               </p>
               <p className="text-xs tracking-widest font-semibold" style={{ color: "#7A8BB0" }}>CONSULTING</p>
             </div>

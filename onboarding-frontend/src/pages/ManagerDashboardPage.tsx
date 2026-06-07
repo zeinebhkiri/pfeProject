@@ -232,7 +232,7 @@ const userPosteMap = useMemo(() => {
           </div>
 
           {/* ── Stats cards ── */}
-          <div className="grid grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
             {[
               { label: "Total équipe",      value: teamList.length, icon: "👥", color: "#00AEEF", bg: "rgba(0,174,239,0.08)"   },
               { label: "Validés",           value: valides,         icon: "✅", color: "#8DC63F", bg: "rgba(141,198,63,0.08)" },
@@ -253,7 +253,7 @@ const userPosteMap = useMemo(() => {
           </div>
 
           {/* ── Tableau équipe + Documents ── */}
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6">
 
             {/* Tableau équipe */}
             <div className="card overflow-hidden">
@@ -311,6 +311,7 @@ const userPosteMap = useMemo(() => {
                   </p>
                 </div>
               ) : (
+                <div className="table-responsive"> 
                 <table className="w-full text-sm">
                   <thead>
                     <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -388,6 +389,7 @@ const userPosteMap = useMemo(() => {
                     })}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
 

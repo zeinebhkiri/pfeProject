@@ -16,8 +16,8 @@ h1, h2, h3, h4 { font-family: 'Sora', sans-serif; }
   --green-dark:  #72A030;
   --blue-soft:   #A8D8EA;
 
-  --sidebar-w: 268px;
-  --sidebar-collapsed: 72px;
+  --sidebar-w:         268px;
+  --sidebar-collapsed:  72px;
 
   --bg:          #F0F4FA;
   --surface:     #FFFFFF;
@@ -39,6 +39,32 @@ body {
   background: var(--bg);
   color: var(--text);
   transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* ── Layout responsive — NOUVEAU ───────────────────────────────────────────── */
+/*
+  Sur desktop (≥ 768px) : main a un margin-left = largeur sidebar.
+  Sur mobile   (< 768px) : main occupe toute la largeur (sidebar en drawer).
+  À appliquer via la classe .main-content sur chaque <main>.
+*/
+.main-content {
+  margin-left: 0;
+  transition: margin-left 0.3s ease;
+}
+@media (min-width: 768px) {
+  .main-content {
+    margin-left: var(--sidebar-w);
+  }
+}
+
+/* Padding de page adaptatif */
+.page-padding {
+  padding: 1rem;
+}
+@media (min-width: 768px) {
+  .page-padding {
+    padding: 2rem;
+  }
 }
 
 /* ── Sidebar links ── */
@@ -116,7 +142,7 @@ body {
   box-shadow: 0 4px 14px rgba(0,174,239,0.4);
   transform: translateY(-1px);
 }
-.btn-primary:active { transform: scale(0.97); }
+.btn-primary:active  { transform: scale(0.97); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 .btn-secondary {
@@ -134,7 +160,7 @@ body {
   justify-content: center;
   gap: 6px;
 }
-.btn-secondary:hover { opacity: 0.8; }
+.btn-secondary:hover  { opacity: 0.8; }
 .btn-secondary:active { transform: scale(0.97); }
 
 .btn-danger {
@@ -152,8 +178,8 @@ body {
   justify-content: center;
   gap: 6px;
 }
-.btn-danger:hover { background: #fee2e2; }
-.btn-danger:active { transform: scale(0.97); }
+.btn-danger:hover   { background: #fee2e2; }
+.btn-danger:active  { transform: scale(0.97); }
 .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-success {
@@ -176,7 +202,7 @@ body {
   box-shadow: 0 4px 14px rgba(141,198,63,0.4);
   transform: translateY(-1px);
 }
-.btn-success:active { transform: scale(0.97); }
+.btn-success:active  { transform: scale(0.97); }
 .btn-success:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 /* ── Input ── */
@@ -215,29 +241,19 @@ body {
 .modal-panel    { animation: modalIn 0.2s ease; }
 .page-enter     { animation: pageFade 0.35s ease; }
 
-@keyframes fadeIn  { from { opacity: 0; }                          to { opacity: 1; } }
-@keyframes slideIn { from { transform: translateX(100%); }         to { transform: translateX(0); } }
-@keyframes modalIn { from { opacity: 0; transform: scale(0.95); }  to { opacity: 1; transform: scale(1); } }
+@keyframes fadeIn  { from { opacity: 0; }                           to { opacity: 1; } }
+@keyframes slideIn { from { transform: translateX(-100%); }         to { transform: translateX(0); } }
+@keyframes modalIn { from { opacity: 0; transform: scale(0.95); }   to { opacity: 1; transform: scale(1); } }
 @keyframes pageFade{ from { opacity: 0; transform: translateY(8px);} to { opacity: 1; transform: translateY(0); } }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar       { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
-/* ══════════════════════════════════════════════════════════════
-   RESPONSIVE — Mobile first
-   ══════════════════════════════════════════════════════════════ */
-
-/* Mobile: sidebar-w = 0 so all pages get full width automatically */
-@media (max-width: 767px) {
-  :root {
-    --sidebar-w: 0px !important;
-    --sidebar-collapsed: 0px !important;
-  }
-  /* Space for bottom nav */
-  main {
-    padding-bottom: 80px !important;
-  }
+/* ── Tables responsives ── */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }

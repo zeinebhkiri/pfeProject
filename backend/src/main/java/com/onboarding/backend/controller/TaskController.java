@@ -405,10 +405,21 @@ public class TaskController {
      * Vérifie si l'acteur peut agir sur la tâche.
      */
     private boolean canActOnTask(Task task, TypeActeur acteur) {
-        if (task.getActeurProgressions() == null) return false;
-
-        return task.getActeurProgressions().stream()
+        // Si acteurProgressions absent → se baser sur typeActeurs
+        if (task.getActeurProgressions() == null || task.getActeurProgressions().isEmpty()) {
+            return task.getTypeActeurs() != null && task.getTypeActeurs().contains(acteur);
+        }
+        // Vérifier que cet acteur a une entrée non complétée
+        boolean found = task.getActeurProgressions().stream()
                 .anyMatch(ap -> ap.getTypeActeur() == acteur && !ap.isComplete());
+        if (found) return true;
+        // Fallback : si l'acteur est dans typeActeurs mais pas dans progressions
+        boolean inProgressions = task.getActeurProgressions().stream()
+                .anyMatch(ap -> ap.getTypeActeur() == acteur);
+        if (!inProgressions && task.getTypeActeurs() != null && task.getTypeActeurs().contains(acteur)) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -416,16 +427,31 @@ public class TaskController {
      * Retourne true si TOUS les acteurs ont complété leur part.
      */
     private boolean marquerActeurComplete(Task task, TypeActeur acteur) {
-        if (task.getActeurProgressions() == null) return true;
-
+        // Initialiser acteurProgressions si absent
+        if (task.getActeurProgressions() == null) {
+            task.setActeurProgressions(new java.util.ArrayList<>());
+        }
+        // S'assurer que tous les typeActeurs ont une entrée dans acteurProgressions
+        if (task.getTypeActeurs() != null) {
+            for (TypeActeur ta : task.getTypeActeurs()) {
+                boolean hasEntry = task.getActeurProgressions().stream()
+                        .anyMatch(ap -> ap.getTypeActeur() == ta);
+                if (!hasEntry) {
+                    Task.ActeurProgression newAp = new Task.ActeurProgression();
+                    newAp.setTypeActeur(ta);
+                    newAp.setComplete(false);
+                    task.getActeurProgressions().add(newAp);
+                }
+            }
+        }
+        // Marquer cet acteur comme complet
         for (Task.ActeurProgression ap : task.getActeurProgressions()) {
             if (ap.getTypeActeur() == acteur && !ap.isComplete()) {
                 ap.setComplete(true);
                 ap.setDateCompletion(LocalDateTime.now());
-                break; // un seul acteur de ce type à marquer
+                break;
             }
         }
-
         return task.getActeurProgressions().stream()
                 .allMatch(Task.ActeurProgression::isComplete);
     }
@@ -458,13 +484,26 @@ public class TaskController {
         Task task = taskRepository.findById(taskId).orElse(null);
         if (task == null) return TypeActeur.SALARIE;
 
+        // Fallback immédiat selon le rôle si acteurIds est null ou vide
+        if (task.getActeurIds() == null || task.getActeurIds().isEmpty()) {
+            return switch (user.getRole()) {
+                case MANAGER -> TypeActeur.MANAGER;
+                case ADMIN   -> TypeActeur.RH;
+                default      -> TypeActeur.SALARIE;
+            };
+        }
+
         // Vérifier si l'utilisateur est assigné à cette tâche
         for (int i = 0; i < task.getActeurIds().size(); i++) {
-            if (task.getActeurIds().get(i).equals(user.getId())) {
+            if (task.getActeurIds().get(i) != null
+                    && task.getActeurIds().get(i).equals(user.getId())) {
                 // L'utilisateur a un rôle spécifique dans cette tâche
-                Task.ActeurProgression ap = task.getActeurProgressions().get(i);
-                if (ap != null) {
-                    return ap.getTypeActeur();
+                if (task.getActeurProgressions() != null
+                        && i < task.getActeurProgressions().size()) {
+                    Task.ActeurProgression ap = task.getActeurProgressions().get(i);
+                    if (ap != null) {
+                        return ap.getTypeActeur();
+                    }
                 }
             }
         }

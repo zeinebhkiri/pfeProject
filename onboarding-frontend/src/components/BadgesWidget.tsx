@@ -499,6 +499,7 @@ const BadgesWidget = ({ tasks, parcours }: BadgesWidgetProps) => {
       {selectedBadge && (
         <BadgeModal badge={selectedBadge} onClose={() => setSelectedBadge(null)} />
       )}
+
     </div>
   );
 };

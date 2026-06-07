@@ -392,6 +392,928 @@ const Divider = ({ label }: { label: string }) => (
   </div>
 );
 
+// ─── ManagerChampionship ─────────────────────────────────────────────────────
+
+type MgrStat = {
+  mgr: User;
+  total: number;
+  terminesEnTemps: number;
+  taux: number;
+  progMoy: number;
+  teamSize: number;
+};
+
+// Palettes podium
+const PODIUM_META = [
+  { rank: 1, medal: "🥇", height: 140, gradient: "linear-gradient(180deg,#F59E0B,#d97706)", ring: "#F59E0B", avatar: "linear-gradient(135deg,#F59E0B,#92400e)", label: "#1 MEILLEUR", glow: "0 0 40px #F59E0B50" },
+  { rank: 2, medal: "🥈", height: 95,  gradient: "linear-gradient(180deg,#94a3b8,#64748b)", ring: "#94a3b8",  avatar: "linear-gradient(135deg,#94a3b8,#475569)", label: "#2",          glow: "0 0 24px #94a3b830" },
+  { rank: 3, medal: "🥉", height: 60,  gradient: "linear-gradient(180deg,#cd7f32,#a0522d)", ring: "#cd7f32",  avatar: "linear-gradient(135deg,#cd7f32,#78350f)", label: "#3",          glow: "0 0 16px #cd7f3220" },
+];
+
+// Order: 2nd left, 1st center, 3rd right
+const PODIUM_ORDER = [1, 0, 2];
+
+const PodiumCard = ({ item, meta, scoreGlobal }: { item: MgrStat; meta: typeof PODIUM_META[0]; scoreGlobal: number }) => {
+  const isFirst = meta.rank === 1;
+
+  return (
+    <div className="flex flex-col items-center" style={{ width: isFirst ? 200 : 168 }}>
+
+      {/* Medal */}
+      <div style={{ fontSize: isFirst ? 36 : 28, marginBottom: isFirst ? 6 : 4, filter: isFirst ? "drop-shadow(0 0 12px #f59e0b80)" : undefined }}>
+        {meta.medal}
+      </div>
+
+      {/* #1 label */}
+      {isFirst && (
+        <div className="mb-3 px-3 py-1 rounded-full text-xs font-black tracking-widest"
+          style={{ background: "rgba(245,158,11,0.15)", color: "#F59E0B", border: "1px solid rgba(245,158,11,0.35)", letterSpacing: "0.1em" }}>
+          ★ MEILLEUR MANAGER
+        </div>
+      )}
+
+      {/* Avatar */}
+      <div className="relative mb-3">
+        {isFirst && (
+          <div className="absolute inset-0 rounded-full blur-xl scale-125 opacity-60"
+            style={{ background: "#F59E0B" }} />
+        )}
+        <div
+          className="relative flex items-center justify-center text-white font-black rounded-full"
+          style={{
+            width: isFirst ? 68 : 56,
+            height: isFirst ? 68 : 56,
+            fontSize: isFirst ? 22 : 18,
+            background: meta.avatar,
+            boxShadow: `0 0 0 3px ${meta.ring}40, ${meta.glow}`,
+            fontFamily: "Sora",
+          }}
+        >
+          {item.mgr.prenom?.[0]}{item.mgr.nom?.[0]}
+        </div>
+        {/* Rank badge */}
+        <div className="absolute -bottom-1 -right-1 rounded-full flex items-center justify-center text-white font-black"
+          style={{
+            width: isFirst ? 24 : 20,
+            height: isFirst ? 24 : 20,
+            fontSize: isFirst ? 11 : 9,
+            background: meta.gradient,
+          }}>
+          {meta.rank}
+        </div>
+      </div>
+
+      {/* Name */}
+      <p className="font-black text-center leading-tight mb-0.5"
+        style={{ fontSize: isFirst ? 15 : 13, fontFamily: "Sora", color: C.text }}>
+        {item.mgr.prenom} {item.mgr.nom}
+      </p>
+      <p className="text-xs mb-4" style={{ color: C.muted }}>
+        {item.teamSize} membre{item.teamSize > 1 ? "s" : ""}
+      </p>
+
+      {/* Stats card */}
+      <div className="w-full rounded-2xl px-4 py-3 mb-0 text-center"
+        style={{
+          background: isFirst ? `${C.amber}0d` : "var(--bg)",
+          border: `1.5px solid ${meta.ring}35`,
+        }}>
+        {/* Taux */}
+        <p style={{ fontSize: isFirst ? 28 : 22, fontFamily: "Sora", color: meta.ring, fontWeight: 900, lineHeight: 1 }}>
+          {item.taux}%
+        </p>
+        <p className="text-xs mt-0.5 mb-3" style={{ color: C.muted }}>réussite J+30</p>
+
+        {/* Score global */}
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs" style={{ color: C.muted }}>Score</span>
+          <span className="text-xs font-black" style={{ color: meta.ring }}>{scoreGlobal}/100</span>
+        </div>
+        <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ background: "var(--border)" }}>
+          <div className="h-full rounded-full" style={{ width: `${scoreGlobal}%`, background: meta.gradient }} />
+        </div>
+
+        {/* Progression équipe */}
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs" style={{ color: C.muted }}>Équipe</span>
+          <span className="text-xs font-bold" style={{ color: C.cyan }}>{item.progMoy}%</span>
+        </div>
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
+          <div className="h-full rounded-full" style={{ width: `${item.progMoy}%`, background: `linear-gradient(90deg,${C.cyan},${C.green})` }} />
+        </div>
+
+        {/* Parcours */}
+        <p className="text-xs mt-2" style={{ color: C.muted }}>
+          {item.terminesEnTemps}/{item.total} parcours terminés
+        </p>
+      </div>
+
+      {/* Podium block */}
+      <div className="w-full rounded-t-2xl flex items-center justify-center relative overflow-hidden"
+        style={{ height: meta.height, background: meta.gradient, boxShadow: `0 -6px 24px ${meta.ring}30` }}>
+        {/* Shine */}
+        <div className="absolute inset-0 opacity-20"
+          style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.3) 0%, transparent 50%)" }} />
+        <span className="relative font-black opacity-20 text-white"
+          style={{ fontSize: isFirst ? 40 : 30, fontFamily: "Sora" }}>
+          {meta.rank}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+const ManagerChampionship = ({ managers }: { managers: MgrStat[] }) => {
+  const tauxMoyen = managers.length > 0
+    ? Math.round(managers.reduce((a, m) => a + m.taux, 0) / managers.length)
+    : 0;
+
+  return (
+    <div className="mt-6 mb-6 space-y-5">
+
+      {/* ── Banner ── */}
+      <div className="relative rounded-3xl overflow-hidden px-8 py-7"
+        style={{
+          background: `linear-gradient(135deg, ${C.cyan} 0%, ${C.navyDark} 60%, #0a2a4a 100%)`,
+          border: `1px solid ${C.cyan}40`,
+        }}>
+
+        {/* Particles */}
+        {[...Array(28)].map((_, i) => (
+          <div key={i} className="absolute rounded-full pointer-events-none"
+            style={{
+              width: i % 3 === 0 ? 3 : 2,
+              height: i % 3 === 0 ? 3 : 2,
+              background: i % 4 === 0 ? C.green : "white",
+              opacity: 0.07 + (i % 5) * 0.05,
+              top: `${(i * 31) % 100}%`,
+              left: `${(i * 67) % 100}%`,
+            }} />
+        ))}
+
+        {/* Glow blobs */}
+        <div className="absolute -top-10 -left-10 w-52 h-52 rounded-full pointer-events-none"
+          style={{ background: C.cyan, opacity: 0.18, filter: "blur(50px)" }} />
+        <div className="absolute -bottom-10 -right-10 w-48 h-48 rounded-full pointer-events-none"
+          style={{ background: C.green, opacity: 0.12, filter: "blur(50px)" }} />
+
+        <div className="relative z-10 flex items-center justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", fontSize: 20 }}>
+                🏆
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-white" style={{ fontFamily: "Sora", letterSpacing: "-0.3px" }}>
+                  Manager Championship
+                </h2>
+                <p className="text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
+                  Classé par score global · 60% réussite J+30 + 40% progression équipe
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {[
+              { value: managers.length, label: "managers",   color: "white", bg: "rgba(255,255,255,0.12)", border: "rgba(255,255,255,0.2)" },
+              { value: `${tauxMoyen}%`, label: "taux moyen", color: C.green, bg: `${C.green}25`,           border: `${C.green}40`          },
+            ].map((stat, i) => (
+              <div key={i} className="text-center px-5 py-3 rounded-2xl"
+                style={{ background: stat.bg, border: `1px solid ${stat.border}`, backdropFilter: "blur(8px)" }}>
+                <p className="text-2xl font-black leading-none" style={{ color: stat.color, fontFamily: "Sora" }}>
+                  {stat.value}
+                </p>
+                <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.55)" }}>{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Podium ── */}
+      {managers.length >= 1 && (
+        <div className="relative rounded-3xl overflow-hidden"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+          }}>
+
+          {/* Color strip top */}
+          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-3xl pointer-events-none"
+            style={{ background: `linear-gradient(90deg, ${C.violet}, ${C.cyan}, ${C.green}, ${C.amber})` }} />
+
+          {/* Glow blobs */}
+          <div className="absolute bottom-0 left-1/4 w-48 h-32 pointer-events-none"
+            style={{ background: C.amber, opacity: 0.05, filter: "blur(50px)" }} />
+          <div className="absolute bottom-0 right-1/4 w-48 h-32 pointer-events-none"
+            style={{ background: C.cyan, opacity: 0.05, filter: "blur(50px)" }} />
+          <div className="absolute top-0 left-0 w-32 h-32 pointer-events-none"
+            style={{ background: C.violet, opacity: 0.04, filter: "blur(40px)" }} />
+
+          <div className="relative z-10 px-8 pt-8 pb-0">
+
+            {/* Podium top 3 */}
+            <div className="flex items-end justify-center gap-5" style={{ minHeight: 380 }}>
+              {PODIUM_ORDER.map((idx) => {
+                const item = managers[idx];
+                if (!item) return <div key={idx} style={{ width: 168 }} />;
+                const meta = PODIUM_META[idx];
+                const scoreGlobal = Math.round(item.taux * 0.6 + item.progMoy * 0.4);
+                return <PodiumCard key={item.mgr.id} item={item} meta={meta} scoreGlobal={scoreGlobal} />;
+              })}
+            </div>
+
+            {/* Stage floor */}
+            <div className="h-4 -mx-8"
+              style={{ background: "linear-gradient(to right, transparent, rgba(0,174,239,0.15) 30%, rgba(245,158,11,0.1) 50%, rgba(0,174,239,0.15) 70%, transparent)" }} />
+          </div>
+
+          {/* Rest of ranking (4th+) inline pills */}
+          {managers.length > 3 && (
+            <div className="relative z-10 px-8 py-4 flex flex-wrap gap-2"
+              style={{ borderTop: "1px solid var(--border)" }}>
+              <span className="text-xs font-bold uppercase tracking-widest mr-2" style={{ color: C.muted }}>
+                Autres
+              </span>
+              {managers.slice(3).map((item, i) => {
+                const score = Math.round(item.taux * 0.6 + item.progMoy * 0.4);
+                const scoreColor = score >= 70 ? C.green : score >= 45 ? C.amber : C.rose;
+                return (
+                  <div key={item.mgr.id}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
+                    style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                    <span className="text-xs font-bold" style={{ color: C.muted }}>#{i + 4}</span>
+                    <span className="text-xs font-semibold" style={{ color: C.text }}>{item.mgr.prenom} {item.mgr.nom}</span>
+                    <span className="text-xs font-black px-1.5 py-0.5 rounded-lg"
+                      style={{ background: `${scoreColor}18`, color: scoreColor }}>
+                      {score}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Leaderboard table ── */}
+      <div className="card overflow-hidden">
+        <div className="px-6 py-4 flex items-center justify-between"
+          style={{ borderBottom: `1px solid ${C.border}` }}>
+          <div>
+            <h2 className="text-base font-bold" style={{ color: C.text, fontFamily: "Sora" }}>Classement complet</h2>
+            <p className="text-xs mt-0.5" style={{ color: C.muted }}>
+              Score = 60% taux réussite J+30 + 40% progression moyenne équipe
+            </p>
+          </div>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${C.border}`, background: C.bg }}>
+                {["Rang", "Manager", "Équipe", "Terminés J+30", "Taux réussite", "Prog. moy.", "Score"].map(h => (
+                  <th key={h} className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide"
+                    style={{ color: C.muted }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {managers.map((item, idx) => {
+                const medals = ["🥇", "🥈", "🥉"];
+                const tauxColor = item.taux >= 80 ? C.green : item.taux >= 50 ? C.amber : C.rose;
+                const score = Math.round(item.taux * 0.6 + item.progMoy * 0.4);
+                const scoreColor = score >= 80 ? C.green : score >= 50 ? C.cyan : C.amber;
+                const isTop = idx === 0;
+                return (
+                  <tr key={item.mgr.id}
+                    style={{ borderBottom: `1px solid ${C.border}`, background: isTop ? "rgba(245,158,11,0.03)" : "transparent" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = C.bg; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = isTop ? "rgba(245,158,11,0.03)" : "transparent"; }}>
+                    <td className="px-5 py-4">
+                      {idx < 3
+                        ? <span className="text-xl">{medals[idx]}</span>
+                        : <span className="text-sm font-bold" style={{ color: C.muted }}>#{idx + 1}</span>}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                          style={{
+                            background: isTop ? "linear-gradient(135deg,#F59E0B,#d97706)" : `linear-gradient(135deg,${C.violet},${C.navy})`,
+                            boxShadow: isTop ? "0 0 12px #F59E0B40" : "none",
+                          }}>
+                          {item.mgr.prenom?.[0]}{item.mgr.nom?.[0]}
+                        </div>
+                        <div>
+                          <p className="font-semibold" style={{ color: C.text }}>{item.mgr.prenom} {item.mgr.nom}</p>
+                          <p className="text-xs" style={{ color: C.muted }}>{item.mgr.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full"
+                        style={{ background: "#e0f7ff", color: C.cyan }}>
+                        {item.teamSize} membres
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className="font-bold tabular-nums" style={{ color: C.green, fontFamily: "Sora" }}>{item.terminesEnTemps}</span>
+                      <span className="text-xs ml-1" style={{ color: C.muted }}>/ {item.total}</span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 h-2 rounded-full overflow-hidden" style={{ background: C.border }}>
+                          <div className="h-full rounded-full" style={{ width: `${item.taux}%`, background: tauxColor, transition: "width 0.8s" }} />
+                        </div>
+                        <span className="text-sm font-bold w-10" style={{ color: tauxColor, fontFamily: "Sora" }}>{item.taux}%</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-2 rounded-full overflow-hidden" style={{ background: C.border }}>
+                          <div className="h-full rounded-full" style={{ width: `${item.progMoy}%`, background: `linear-gradient(to right,${C.cyan},${C.navy})` }} />
+                        </div>
+                        <span className="text-xs font-semibold w-8" style={{ color: C.cyan }}>{item.progMoy}%</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0"
+                          style={{ background: `linear-gradient(135deg,${scoreColor},${scoreColor}cc)`, boxShadow: `0 2px 8px ${scoreColor}40` }}>
+                          {score}
+                        </div>
+                        <div className="w-12 h-1.5 rounded-full overflow-hidden" style={{ background: C.border }}>
+                          <div className="h-full rounded-full" style={{ width: `${score}%`, background: scoreColor }} />
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── ProgressionGlobaleCard ──────────────────────────────────────────────────
+
+type ProgItem = {
+  userId: string; prenom: string; nom: string; poste: string;
+  progression: number; phase: string; joursRestants: number;
+  statut: "ok" | "risque" | "bloque";
+};
+
+const PROG_FILTERS = [
+  { key: "all",   label: "Tous",    min: 0,   max: 100, color: C.navy   },
+  { key: "p0",    label: "0%",      min: 0,   max: 0,   color: "#94a3b8" },
+  { key: "p25",   label: "1–25%",   min: 1,   max: 25,  color: C.amber  },
+  { key: "p50",   label: "26–50%",  min: 26,  max: 50,  color: C.violet },
+  { key: "p75",   label: "51–75%",  min: 51,  max: 75,  color: C.cyan   },
+  { key: "p99",   label: "76–99%",  min: 76,  max: 99,  color: C.green  },
+  { key: "p100",  label: "100%",    min: 100, max: 100, color: C.green  },
+] as const;
+
+type FilterKey = typeof PROG_FILTERS[number]["key"];
+
+const ProgressionGlobaleCard = ({
+  progressionGlobale,
+  parcoursActifsLength,
+}: {
+  progressionGlobale: ProgItem[];
+  parcoursActifsLength: number;
+}) => {
+  const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
+
+  const filtered = activeFilter === "all"
+    ? progressionGlobale
+    : progressionGlobale.filter((item) => {
+        const f = PROG_FILTERS.find(f => f.key === activeFilter)!;
+        return item.progression >= f.min && item.progression <= f.max;
+      });
+
+  const activeFilterDef = PROG_FILTERS.find(f => f.key === activeFilter)!;
+
+  // Compte par tranche pour les badges
+  const counts = PROG_FILTERS.reduce((acc, f) => {
+    acc[f.key] = f.key === "all"
+      ? progressionGlobale.length
+      : progressionGlobale.filter(i => i.progression >= f.min && i.progression <= f.max).length;
+    return acc;
+  }, {} as Record<string, number>);
+
+  return (
+    <Card>
+      <SectionHeader
+        title="Progression globale des salariés"
+        sub={`${parcoursActifsLength} salariés suivis`}
+      />
+
+      {/* ── Filtres ── */}
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {PROG_FILTERS.map((f) => {
+          const isActive = activeFilter === f.key;
+          const count = counts[f.key];
+          return (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setActiveFilter(f.key)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              style={{
+                background: isActive ? f.color : "var(--bg)",
+                color: isActive ? "white" : C.muted,
+                border: `1.5px solid ${isActive ? f.color : "var(--border)"}`,
+                transform: isActive ? "scale(1.05)" : "scale(1)",
+                boxShadow: isActive ? `0 2px 8px ${f.color}40` : "none",
+              }}
+            >
+              {f.label}
+              <span
+                className="rounded-full px-1.5 py-0.5 text-xs font-bold leading-none"
+                style={{
+                  background: isActive ? "rgba(255,255,255,0.25)" : `${f.color}18`,
+                  color: isActive ? "white" : f.color,
+                  minWidth: 18,
+                  textAlign: "center",
+                }}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Résultat filtre ── */}
+      {activeFilter !== "all" && (
+        <div className="flex items-center justify-between mb-3 px-3 py-2 rounded-xl"
+          style={{ background: `${activeFilterDef.color}10`, border: `1px solid ${activeFilterDef.color}25` }}>
+          <span className="text-xs font-semibold" style={{ color: activeFilterDef.color }}>
+            Tranche {activeFilterDef.label}
+          </span>
+          <span className="text-xs font-bold" style={{ color: activeFilterDef.color }}>
+            {filtered.length} salarié{filtered.length !== 1 ? "s" : ""}
+            {progressionGlobale.length > 0 && (
+              <span className="font-normal ml-1" style={{ color: C.muted }}>
+                ({Math.round((filtered.length / progressionGlobale.length) * 100)}% du total)
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+
+      {/* ── Liste ── */}
+      <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+        {filtered.length === 0 && (
+          <div className="py-10 text-center">
+            <p className="text-2xl mb-2">🔍</p>
+            <p className="text-sm font-medium" style={{ color: C.muted }}>
+              Aucun salarié dans cette tranche
+            </p>
+          </div>
+        )}
+        {filtered.map((item) => {
+          const statusIcon  = item.statut === "bloque" ? "🔴" : item.statut === "risque" ? "🟡" : "🟢";
+          const statusColor = item.statut === "bloque" ? C.rose  : item.statut === "risque" ? C.amber : C.green;
+          const statusLabel = item.statut === "bloque" ? "Bloqué" : item.statut === "risque" ? "À risque" : "En bonne voie";
+          const phaseColor  = item.phase === "Terminé" ? C.green
+            : item.phase === "Validation"             ? C.cyan
+            : item.phase === "Montée en compétence"   ? C.violet
+            : item.phase === "Intégration"             ? C.amber
+            : C.muted;
+          return (
+            <div key={item.userId} className="p-3.5 rounded-2xl transition-all"
+              style={{
+                background: item.statut === "bloque" ? "#fff1f280" : item.statut === "risque" ? "#fffbeb80" : C.surface,
+                border: `1.5px solid ${item.statut === "bloque" ? C.rose + "40" : item.statut === "risque" ? C.amber + "40" : C.border}`,
+              }}>
+              {/* Row 1 */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                    style={{ background: `linear-gradient(135deg, ${C.cyan}, ${C.navy})` }}>
+                    {item.prenom?.[0]}{item.nom?.[0]}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold leading-tight" style={{ color: C.text }}>
+                      {item.prenom} {item.nom}
+                    </p>
+                    <p className="text-xs" style={{ color: C.muted }}>{item.poste || "—"}</p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: statusColor + "18", color: statusColor }}>
+                  {statusIcon} {statusLabel}
+                </span>
+              </div>
+              {/* Row 2 */}
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: C.border }}>
+                  <div className="h-full rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${item.progression}%`,
+                      background: item.statut === "bloque"
+                        ? `linear-gradient(to right, ${C.rose}, #c01)`
+                        : item.statut === "risque"
+                        ? `linear-gradient(to right, ${C.amber}, #d97706)`
+                        : `linear-gradient(to right, ${C.cyan}, ${C.green})`,
+                    }} />
+                </div>
+                <span className="text-xs font-bold tabular-nums w-9 text-right"
+                  style={{ color: item.statut === "bloque" ? C.rose : item.statut === "risque" ? C.amber : C.cyan }}>
+                  {item.progression}%
+                </span>
+              </div>
+              {/* Row 3 */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: phaseColor + "18", color: phaseColor }}>
+                  📍 {item.phase}
+                </span>
+                <span className="text-xs" style={{ color: item.joursRestants < 0 ? C.rose : C.muted }}>
+                  {item.joursRestants < 0
+                    ? `⏰ ${Math.abs(item.joursRestants)}j de retard`
+                    : item.joursRestants === 0
+                    ? "📅 Dernier jour"
+                    : `📅 ${item.joursRestants}j restants`}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Légende ── */}
+      <div className="flex gap-4 mt-4 pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
+        {[
+          { icon: "🟢", label: "En bonne voie", count: progressionGlobale.filter(p => p.statut === "ok").length,     color: C.green },
+          { icon: "🟡", label: "À risque",       count: progressionGlobale.filter(p => p.statut === "risque").length, color: C.amber },
+          { icon: "🔴", label: "Bloqué",          count: progressionGlobale.filter(p => p.statut === "bloque").length, color: C.rose  },
+        ].map(s => (
+          <div key={s.label} className="flex items-center gap-1.5">
+            <span className="text-xs">{s.icon}</span>
+            <span className="text-xs" style={{ color: C.muted }}>{s.label}</span>
+            <span className="text-xs font-bold" style={{ color: s.color }}>({s.count})</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+};
+
+// ─── TachesParPosteCard ──────────────────────────────────────────────────────
+type PosteStats = {
+  positionId: string;
+  titrePose: string;
+  tauxMoyen: number;
+  salaries: { userId: string; prenom: string; nom: string; totalTaches: number; tachesRealisees: number; tachesEnRetard: number; taux: number }[];
+  realisees: { userId: string; prenom: string; nom: string; totalTaches: number; tachesRealisees: number; tachesEnRetard: number; taux: number }[];
+  nonRealisees: { userId: string; prenom: string; nom: string; totalTaches: number; tachesRealisees: number; tachesEnRetard: number; taux: number }[];
+};
+
+const SalarieRow = ({
+  s, accent, showTasks,
+}: {
+  s: PosteStats["salaries"][0];
+  accent: string;
+  showTasks: boolean;
+}) => (
+  <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
+    style={{ background: "var(--bg)", border: `1px solid ${accent}18` }}>
+    <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+      style={{ background: `linear-gradient(135deg, ${accent}, ${C.navy})` }}>
+      {s.prenom[0]}{s.nom[0]}
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-semibold truncate" style={{ color: C.text }}>
+        {s.prenom} {s.nom}
+      </p>
+      {showTasks && s.totalTaches > 0 && (
+        <p className="text-xs" style={{ color: C.muted }}>
+          {s.tachesRealisees} dans les delais
+          {s.tachesEnRetard > 0 && <span className="ml-1" style={{ color: C.rose }}>· {s.tachesEnRetard} en retard</span>}
+        </p>
+      )}
+    </div>
+    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+      <span className="text-xs font-bold tabular-nums" style={{ color: accent }}>{s.taux}%</span>
+      <div className="w-14 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
+        <div className="h-full rounded-full" style={{ width: `${s.taux}%`, background: accent }} />
+      </div>
+    </div>
+  </div>
+);
+
+const PosteAccordion = ({ groupe }: { groupe: PosteStats }) => {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"realisees" | "nonRealisees">("realisees");
+  const tauxColor = groupe.tauxMoyen >= 80 ? C.green : groupe.tauxMoyen >= 50 ? C.amber : C.rose;
+  const circumference = 2 * Math.PI * 20;
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="w-full text-left px-5 py-4 flex items-center gap-4 transition"
+        style={{ background: open ? `${tauxColor}06` : undefined }}>
+        <div className="relative w-12 h-12 flex-shrink-0">
+          <svg width="48" height="48" style={{ transform: "rotate(-90deg)" }}>
+            <circle cx="24" cy="24" r="20" fill="none" stroke="var(--border)" strokeWidth="4" />
+            <circle cx="24" cy="24" r="20" fill="none" stroke={tauxColor} strokeWidth="4"
+              strokeDasharray={`${(groupe.tauxMoyen / 100) * circumference} ${circumference}`}
+              strokeLinecap="round" />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span style={{ fontSize: 10, fontWeight: 900, color: tauxColor, fontFamily: "Sora" }}>{groupe.tauxMoyen}%</span>
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold truncate" style={{ color: C.text, fontFamily: "Sora" }}>{groupe.titrePose}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: `${C.green}15`, color: C.green }}>
+              ✓ {groupe.realisees.length} ont realise
+            </span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: `${C.rose}15`, color: C.rose }}>
+              ✗ {groupe.nonRealisees.length} n'ont pas realise
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1.5 flex-shrink-0" style={{ minWidth: 80 }}>
+          <span className="text-xs" style={{ color: C.muted }}>{groupe.salaries.length} salarie{groupe.salaries.length > 1 ? "s" : ""}</span>
+          <div className="w-20 h-2 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
+            <div className="h-full rounded-full" style={{ width: `${groupe.tauxMoyen}%`, background: tauxColor }} />
+          </div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2.5" className="flex-shrink-0"
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{ borderTop: "1px solid var(--border)" }}>
+          <div className="flex gap-1 p-3" style={{ background: "var(--bg)" }}>
+            {([
+              { key: "realisees" as const,    label: `Ont realise (${groupe.realisees.length})`,     color: C.green },
+              { key: "nonRealisees" as const, label: `N ont pas realise (${groupe.nonRealisees.length})`, color: C.rose },
+            ]).map(t => (
+              <button key={t.key} type="button" onClick={() => setTab(t.key)}
+                className="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition"
+                style={{
+                  background: tab === t.key ? t.color : "transparent",
+                  color: tab === t.key ? "white" : C.muted,
+                  border: `1.5px solid ${tab === t.key ? t.color : "var(--border)"}`,
+                }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="px-3 pb-3 space-y-2">
+            {tab === "realisees"
+              ? groupe.realisees.length > 0
+                ? groupe.realisees.sort((a, b) => b.taux - a.taux).map(s => <SalarieRow key={s.userId} s={s} accent={C.green} showTasks={true} />)
+                : <p className="text-xs text-center py-4" style={{ color: C.muted }}>Aucun salarie dans cette categorie</p>
+              : groupe.nonRealisees.length > 0
+                ? groupe.nonRealisees.sort((a, b) => b.taux - a.taux).map(s => <SalarieRow key={s.userId} s={s} accent={C.rose} showTasks={true} />)
+                : <p className="text-xs text-center py-4" style={{ color: C.muted }}>Tous les salaries ont realise leurs taches</p>
+            }
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TachesParPosteCard = ({ tachesParPoste }: { tachesParPoste: PosteStats[] }) => {
+  const totalSalaries   = tachesParPoste.reduce((a, g) => a + g.salaries.length, 0);
+  const totalRealisees  = tachesParPoste.reduce((a, g) => a + g.realisees.length, 0);
+  const tauxGlobal      = totalSalaries > 0 ? Math.round((totalRealisees / totalSalaries) * 100) : 0;
+  const tauxGlobalColor = tauxGlobal >= 80 ? C.green : tauxGlobal >= 50 ? C.amber : C.rose;
+
+  return (
+    <Card>
+      <div className="flex items-start justify-between mb-5">
+        <div>
+          <h2 className="text-base font-bold" style={{ color: C.text, fontFamily: "Sora" }}>
+            Taches realisees par poste
+          </h2>
+          <p className="text-xs mt-0.5" style={{ color: C.muted }}>
+            Salaries ayant realise 80% ou plus de leurs taches dans les delais
+          </p>
+        </div>
+        <div className="flex flex-col items-center px-4 py-2.5 rounded-2xl flex-shrink-0"
+          style={{ background: `${tauxGlobalColor}12`, border: `1.5px solid ${tauxGlobalColor}30` }}>
+          <span className="text-2xl font-black leading-none" style={{ color: tauxGlobalColor, fontFamily: "Sora" }}>{tauxGlobal}%</span>
+          <span className="text-xs mt-0.5 font-medium" style={{ color: tauxGlobalColor }}>global</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{ background: `${C.green}10`, border: `1px solid ${C.green}25` }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: `${C.green}20`, fontSize: 16 }}>✓</div>
+          <div>
+            <p className="text-xl font-black leading-none" style={{ color: C.green, fontFamily: "Sora" }}>{totalRealisees}</p>
+            <p className="text-xs mt-0.5" style={{ color: C.green }}>ont realise leurs taches</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{ background: `${C.rose}10`, border: `1px solid ${C.rose}25` }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: `${C.rose}20`, fontSize: 16 }}>✗</div>
+          <div>
+            <p className="text-xl font-black leading-none" style={{ color: C.rose, fontFamily: "Sora" }}>{totalSalaries - totalRealisees}</p>
+            <p className="text-xs mt-0.5" style={{ color: C.rose }}>n ont pas realise</p>
+          </div>
+        </div>
+      </div>
+
+      {tachesParPoste.length === 0 ? (
+        <div className="py-10 text-center">
+          <p className="text-2xl mb-2">📭</p>
+          <p className="text-sm font-medium" style={{ color: C.muted }}>Aucune donnee disponible</p>
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-96 overflow-y-auto pr-0.5">
+          {tachesParPoste.map(g => <PosteAccordion key={g.positionId} groupe={g} />)}
+        </div>
+      )}
+    </Card>
+  );
+};
+
+// ─── StatutParcoursCard ───────────────────────────────────────────────────────
+const StatutParcoursCard = ({
+  enCours,
+  termines,
+  collaborateursActifs,
+  posMap,
+}: {
+  enCours: Parcours[];
+  termines: Parcours[];
+  collaborateursActifs: User[];
+  posMap: Map<string, string>;
+}) => {
+  const [hovered, setHovered] = useState<"encours" | "termines" | null>(null);
+  const total2 = enCours.length + termines.length;
+
+  // Résoudre les salariés d'une liste de parcours
+  const getSalaries = (parcours: Parcours[]) =>
+    parcours.map((p) => {
+      const u = collaborateursActifs.find((u) => u.id === p.userId);
+      return {
+        id: p.id,
+        prenom: u?.prenom ?? "—",
+        nom: u?.nom ?? "—",
+        poste: posMap.get(p.positionId) ?? "—",
+        progression: p.progression ?? 0,
+        statut: p.statut,
+      };
+    });
+
+  const salariesEnCours  = getSalaries(enCours);
+  const salariesTermines = getSalaries(termines);
+
+  const badges = [
+    {
+      key: "encours" as const,
+      label: "En cours",
+      value: enCours.length,
+      color: C.cyan,
+      bg: "#e0f7ff",
+      salaries: salariesEnCours,
+      progColor: (p: number) => p >= 75 ? C.green : p >= 40 ? C.cyan : C.amber,
+    },
+    {
+      key: "termines" as const,
+      label: "Terminés",
+      value: termines.length,
+      color: C.green,
+      bg: "#f0fdf4",
+      salaries: salariesTermines,
+      progColor: (_: number) => C.green,
+    },
+  ];
+
+  return (
+    <Card style={{ position: "relative" }}>
+      <SectionHeader title="Statut des parcours" sub="Survolez En cours ou Terminés pour voir les salariés" />
+
+      {/* Donut 2 segments */}
+      <div className="flex justify-center">
+        <DonutChart
+          segments={[
+            { value: enCours.length,  color: C.cyan,  label: "En cours" },
+            { value: termines.length, color: C.green, label: "Terminés" },
+          ]}
+          size={180} stroke={24}
+          centerLabel={total2}
+          centerSub="parcours"
+        />
+      </div>
+
+      {/* Badges avec hover */}
+      <div className="grid grid-cols-2 gap-3 mt-5">
+        {badges.map((b) => (
+          <div key={b.key} className="relative">
+            <div
+              className="text-center p-3 rounded-xl cursor-pointer select-none transition-all"
+              style={{
+                background: hovered === b.key ? b.color + "22" : b.bg,
+                border: `1.5px solid ${hovered === b.key ? b.color : "transparent"}`,
+                transform: hovered === b.key ? "scale(1.04)" : "scale(1)",
+                transition: "all .18s ease",
+              }}
+              onMouseEnter={() => setHovered(b.key)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              <p className="text-2xl font-bold leading-none" style={{ color: b.color, fontFamily: "Sora" }}>
+                {b.value}
+              </p>
+              <p className="text-xs font-semibold mt-1" style={{ color: b.color }}>{b.label}</p>
+              <p className="text-xs mt-0.5" style={{ color: C.muted }}>
+                {total2 > 0 ? Math.round((b.value / total2) * 100) : 0}%
+              </p>
+            </div>
+
+            {/* Popover liste salariés */}
+            {hovered === b.key && b.salaries.length > 0 && (
+              <div
+                className="absolute z-50 rounded-2xl shadow-2xl overflow-hidden"
+                style={{
+                  top: "calc(100% + 10px)",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: 300,
+                  background: "var(--surface)",
+                  border: `1.5px solid ${b.color}40`,
+                  boxShadow: `0 16px 48px rgba(0,0,0,0.18), 0 0 0 1px ${b.color}20`,
+                }}
+              >
+                {/* Header popover */}
+                <div className="px-4 py-3 flex items-center justify-between"
+                  style={{ background: b.color + "12", borderBottom: `1px solid ${b.color}20` }}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ background: b.color }} />
+                    <span className="text-xs font-bold uppercase tracking-wide" style={{ color: b.color }}>
+                      {b.label} — {b.value} salarié{b.value > 1 ? "s" : ""}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Liste salariés */}
+                <div className="overflow-y-auto" style={{ maxHeight: 260 }}>
+                  {b.salaries.map((s) => (
+                    <div key={s.id}
+                      className="flex items-center gap-3 px-4 py-2.5"
+                      style={{ borderBottom: `1px solid var(--border)` }}
+                    >
+                      {/* Avatar */}
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                        style={{ background: `linear-gradient(135deg, ${b.color}, ${C.navy})` }}
+                      >
+                        {s.prenom[0]}{s.nom[0]}
+                      </div>
+
+                      {/* Infos */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate" style={{ color: C.text }}>
+                          {s.prenom} {s.nom}
+                        </p>
+                        <p className="text-xs truncate" style={{ color: C.muted }}>{s.poste}</p>
+                      </div>
+
+                      {/* Progression */}
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <span className="text-xs font-bold" style={{ color: b.progColor(s.progression) }}>
+                          {s.progression}%
+                        </span>
+                        <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${s.progression}%`,
+                              background: b.progColor(s.progression),
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+};
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 const AnalyticsPage = () => {
   const { data: users = [], isLoading: loadingUsers } = useQuery({ queryKey: ["allUsers"], queryFn: getAllUsersApi });
@@ -526,6 +1448,82 @@ const AnalyticsPage = () => {
 
   const gaugeColor = tauxDelai >= 80 ? C.green : tauxDelai >= 60 ? C.amber : C.rose;
 
+  // ── Tâches réalisées par poste ────────────────────────────────────────────
+  const tachesParPoste = useMemo(() => {
+    // Group all enriched parcours by positionId
+    const groups = new Map<string, {
+      positionId: string;
+      titrePose: string;
+      salaries: {
+        userId: string;
+        prenom: string;
+        nom: string;
+        totalTaches: number;
+        tachesRealisees: number;
+        tachesEnRetard: number;
+        taux: number;
+      }[];
+    }>();
+
+    terminesEnrichis.forEach(({ parcours, salarie, tasks }) => {
+      if (!salarie) return;
+      const titrePose = posMap.get(parcours.positionId) ?? "Poste inconnu";
+      if (!groups.has(parcours.positionId)) {
+        groups.set(parcours.positionId, { positionId: parcours.positionId, titrePose, salaries: [] });
+      }
+      const doneTasks = tasks.filter(t => t.statut === "TERMINE" && t.dateCompletion);
+      const dansDelais = doneTasks.filter(t => {
+        if (!t.echeance || !t.dateCompletion) return true;
+        return new Date(t.dateCompletion) <= new Date(t.echeance);
+      });
+      const enRetard = doneTasks.length - dansDelais.length;
+      const taux = doneTasks.length > 0
+        ? Math.round((dansDelais.length / doneTasks.length) * 100)
+        : tasks.length === 0 ? 0 : 0;
+
+      groups.get(parcours.positionId)!.salaries.push({
+        userId: salarie.id,
+        prenom: salarie.prenom ?? "",
+        nom: salarie.nom ?? "",
+        totalTaches: tasks.length,
+        tachesRealisees: dansDelais.length,
+        tachesEnRetard: enRetard,
+        taux,
+      });
+    });
+
+    // Add en-cours parcours too (tasks without dateCompletion → not done)
+    enCours.forEach(p => {
+      const u = collaborateursActifs.find(u => u.id === p.userId);
+      if (!u) return;
+      const titrePose = posMap.get(p.positionId) ?? "Poste inconnu";
+      if (!groups.has(p.positionId)) {
+        groups.set(p.positionId, { positionId: p.positionId, titrePose, salaries: [] });
+      }
+      // en-cours: taux basé sur progression seulement
+      groups.get(p.positionId)!.salaries.push({
+        userId: u.id,
+        prenom: u.prenom ?? "",
+        nom: u.nom ?? "",
+        totalTaches: 0,
+        tachesRealisees: 0,
+        tachesEnRetard: 0,
+        taux: p.progression ?? 0,
+      });
+    });
+
+    return Array.from(groups.values())
+      .map(g => {
+        const tauxMoyen = g.salaries.length > 0
+          ? Math.round(g.salaries.reduce((a, s) => a + s.taux, 0) / g.salaries.length)
+          : 0;
+        const realisees = g.salaries.filter(s => s.taux >= 80);
+        const nonRealisees = g.salaries.filter(s => s.taux < 80);
+        return { ...g, tauxMoyen, realisees, nonRealisees };
+      })
+      .sort((a, b) => b.tauxMoyen - a.tauxMoyen);
+  }, [terminesEnrichis, enCours, collaborateursActifs, posMap]);
+
   // ── Progression globale des salariés (pour la nouvelle card) ─────────────
   const progressionGlobale = useMemo(() => {
     return parcoursActifs.map((p) => {
@@ -544,7 +1542,7 @@ const AnalyticsPage = () => {
 
       // Statut : bloqué si quiz verrouillé, à risque si retard, ok sinon
       const hasBlockedQuiz = false; // sans accès aux tasks depuis ici
-      const statut =
+      const statut: "ok" | "risque" | "bloque" =
         p.statut === "EXPIRE" ? "bloque"
         : joursRestants < 0 && prog < 100 ? "risque"
         : prog < 30 && joursEcoules > 10 ? "risque"
@@ -659,33 +1657,12 @@ const AnalyticsPage = () => {
           <div className="grid grid-cols-3 gap-6 mb-6">
 
             {/* Donut statuts */}
-            <Card>
-              <SectionHeader title="Statut des parcours" sub="Répartition globale" />
-              <div className="flex justify-center">
-                <DonutChart
-                  segments={[
-                    { value: enCours.length, color: C.cyan, label: "En cours" },
-                    { value: termines.length, color: C.green, label: "Terminés" },
-                    { value: expires.length, color: C.rose, label: "Expirés" },
-                  ]}
-                  size={180} stroke={24}
-                  centerLabel={total}
-                  centerSub="parcours"
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-3 mt-5">
-                {[
-                  { label: "En cours", value: enCours.length, color: C.cyan, bg: "#e0f7ff" },
-                  { label: "Terminés", value: termines.length, color: C.green, bg: "#f0fdf4" },
-                  { label: "Expirés", value: expires.length, color: C.rose, bg: "#fff1f2" },
-                ].map((s) => (
-                  <div key={s.label} className="text-center p-2.5 rounded-xl" style={{ background: s.bg }}>
-                    <p className="text-xl font-bold" style={{ color: s.color, fontFamily: "Sora" }}>{s.value}</p>
-                    <p className="text-xs font-medium" style={{ color: s.color }}>{s.label}</p>
-                  </div>
-                ))}
-              </div>
-            </Card>
+            <StatutParcoursCard
+              enCours={enCours}
+              termines={termines}
+              collaborateursActifs={collaborateursActifs}
+              posMap={posMap}
+            />
 
             {/* Area chart évolution */}
             <Card className="col-span-2">
@@ -708,63 +1685,8 @@ const AnalyticsPage = () => {
           {/* ── Row 2 : Gauge tâches + Bar répartition poste ────────────── */}
           <div className="grid grid-cols-2 gap-6 mb-6">
 
-            {/* Tâches dans les délais */}
-            <Card>
-              <SectionHeader title="Tâches réalisées dans les délais"
-                sub={`Basé sur ${tasksDone.length} tâches terminées`} />
-              <div className="flex items-center gap-8">
-                <div className="flex flex-col items-center gap-2">
-                  <GaugeArc value={tauxDelai} color={gaugeColor} size={160} />
-                  <p className="text-sm font-medium" style={{ color: C.muted }}>
-                    {tauxDelai >= 80 ? "✅ Excellente ponctualité"
-                      : tauxDelai >= 60 ? "⚠️ À surveiller"
-                      : tauxDelai > 0 ? "🔴 Retards importants"
-                      : "— Pas encore de données"}
-                  </p>
-                </div>
-                <div className="flex-1 space-y-4">
-                  <div className="p-3.5 rounded-2xl" style={{ background: "#f0fdf4" }}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold text-emerald-700">Dans les délais</span>
-                      <span className="text-2xl font-bold text-emerald-600" style={{ fontFamily: "Sora" }}>
-                        <AnimatedNumber value={tasksDansDelai.length} />
-                      </span>
-                    </div>
-                    <div className="h-1.5 rounded-full" style={{ background: "#d1fae5" }}>
-                      <div className="h-full rounded-full" style={{
-                        width: `${tauxDelai}%`, background: C.green,
-                        transition: "width 1s cubic-bezier(.4,0,.2,1)",
-                      }} />
-                    </div>
-                  </div>
-                  <div className="p-3.5 rounded-2xl" style={{ background: "#fff1f2" }}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold text-rose-700">En retard</span>
-                      <span className="text-2xl font-bold text-rose-500" style={{ fontFamily: "Sora" }}>
-                        <AnimatedNumber value={tasksDone.length - tasksDansDelai.length} />
-                      </span>
-                    </div>
-                    <div className="h-1.5 rounded-full" style={{ background: "#fecdd3" }}>
-                      <div className="h-full rounded-full" style={{
-                        width: `${100 - tauxDelai}%`, background: C.rose,
-                        transition: "width 1s cubic-bezier(.4,0,.2,1)",
-                      }} />
-                    </div>
-                  </div>
-                  {/* Tâches par type */}
-                  <div className="pt-2 space-y-2">
-                    <p className="text-xs font-semibold" style={{ color: C.muted }}>Par type de tâche</p>
-                    {tasksParType.filter((t) => t.value > 0).map((t) => (
-                      <div key={t.label} className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.color }} />
-                        <span className="text-xs flex-1" style={{ color: C.text }}>{t.label}</span>
-                        <span className="text-xs font-bold" style={{ color: t.color }}>{t.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Card>
+            {/* Tâches réalisées par poste */}
+            <TachesParPosteCard tachesParPoste={tachesParPoste} />
 
             {/* Répartition par poste */}
             <Card>
@@ -833,454 +1755,14 @@ const AnalyticsPage = () => {
             </Card>
 
             {/* Progression globale des salariés */}
-            <Card>
-              <SectionHeader title="Progression globale des salariés"
-                sub={`${parcoursActifs.length} salariés suivis`} />
-              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                {progressionGlobale.length === 0 && (
-                  <div className="py-10 text-center text-sm" style={{ color: C.muted }}>
-                    Aucun parcours actif
-                  </div>
-                )}
-                {progressionGlobale.map((item) => {
-                  const statusIcon = item.statut === "bloque" ? "🔴" : item.statut === "risque" ? "🟡" : "🟢";
-                  const statusColor = item.statut === "bloque" ? C.rose : item.statut === "risque" ? C.amber : C.green;
-                  const statusLabel = item.statut === "bloque" ? "Bloqué" : item.statut === "risque" ? "À risque" : "En bonne voie";
-                  const phaseColor = item.phase === "Terminé" ? C.green : item.phase === "Validation" ? C.cyan : item.phase === "Montée en compétence" ? C.violet : item.phase === "Intégration" ? C.amber : C.muted;
-                  return (
-                    <div key={item.userId} className="p-3.5 rounded-2xl transition-all"
-                      style={{
-                        background: item.statut === "bloque" ? "#fff1f280" : item.statut === "risque" ? "#fffbeb80" : `${C.surface}`,
-                        border: `1.5px solid ${item.statut === "bloque" ? C.rose + "40" : item.statut === "risque" ? C.amber + "40" : C.border}`,
-                      }}>
-                      {/* Row 1: nom + statut */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                            style={{ background: `linear-gradient(135deg, ${C.cyan}, ${C.navy})` }}>
-                            {item.prenom?.[0]}{item.nom?.[0]}
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold leading-tight" style={{ color: C.text }}>
-                              {item.prenom} {item.nom}
-                            </p>
-                            <p className="text-xs" style={{ color: C.muted }}>
-                              {item.poste || "—"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                            style={{ background: statusColor + "18", color: statusColor }}>
-                            {statusIcon} {statusLabel}
-                          </span>
-                        </div>
-                      </div>
-                      {/* Row 2: barre + % */}
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: C.border }}>
-                          <div className="h-full rounded-full transition-all duration-1000"
-                            style={{
-                              width: `${item.progression}%`,
-                              background: item.statut === "bloque"
-                                ? `linear-gradient(to right, ${C.rose}, #c01)` 
-                                : item.statut === "risque"
-                                ? `linear-gradient(to right, ${C.amber}, #d97706)`
-                                : `linear-gradient(to right, ${C.cyan}, ${C.green})`,
-                            }} />
-                        </div>
-                        <span className="text-xs font-bold tabular-nums w-9 text-right"
-                          style={{ color: item.statut === "bloque" ? C.rose : item.statut === "risque" ? C.amber : C.cyan }}>
-                          {item.progression}%
-                        </span>
-                      </div>
-                      {/* Row 3: phase + jours */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                          style={{ background: phaseColor + "18", color: phaseColor }}>
-                          📍 {item.phase}
-                        </span>
-                        <span className="text-xs" style={{ color: item.joursRestants < 0 ? C.rose : C.muted }}>
-                          {item.joursRestants < 0
-                            ? `⏰ ${Math.abs(item.joursRestants)}j de retard`
-                            : item.joursRestants === 0
-                            ? "📅 Dernier jour"
-                            : `📅 ${item.joursRestants}j restants`}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Légende statuts */}
-              <div className="flex gap-4 mt-4 pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
-                {[
-                  { icon: "🟢", label: "En bonne voie", count: progressionGlobale.filter(p => p.statut === "ok").length, color: C.green },
-                  { icon: "🟡", label: "À risque", count: progressionGlobale.filter(p => p.statut === "risque").length, color: C.amber },
-                  { icon: "🔴", label: "Bloqué", count: progressionGlobale.filter(p => p.statut === "bloque").length, color: C.rose },
-                ].map(s => (
-                  <div key={s.label} className="flex items-center gap-1.5">
-                    <span className="text-xs">{s.icon}</span>
-                    <span className="text-xs" style={{ color: C.muted }}>{s.label}</span>
-                    <span className="text-xs font-bold" style={{ color: s.color }}>({s.count})</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
+            <ProgressionGlobaleCard progressionGlobale={progressionGlobale} parcoursActifsLength={parcoursActifs.length} />
           </div>
 
           {/* ── Meilleurs managers ──────────────────────────────────────── */}
           {meilleursManagers.length > 0 && (
             <>
               <Divider label="Championnat des managers — efficacité d'accompagnement" />
-              <div className="mt-6 mb-6">
-
-                {/* ── Arena header ── */}
-                <div className="relative rounded-3xl overflow-hidden mb-6 px-8 py-8"
-                  style={{
-                    background: "linear-gradient(135deg, #0D1B3E 0%, #1A2B6B 60%, #0a1628 100%)",
-                    border: "1px solid rgba(0,174,239,0.2)",
-                  }}>
-                  {/* Stars background */}
-                  {[...Array(24)].map((_, i) => (
-                    <div key={i} className="absolute rounded-full"
-                      style={{
-                        width: i % 3 === 0 ? 3 : 2,
-                        height: i % 3 === 0 ? 3 : 2,
-                        background: "white",
-                        opacity: 0.15 + (i % 4) * 0.1,
-                        top: `${(i * 37) % 100}%`,
-                        left: `${(i * 53) % 100}%`,
-                      }} />
-                  ))}
-                  <div className="relative z-10 flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg"
-                          style={{ background: "rgba(0,174,239,0.2)" }}>🏆</div>
-                        <h2 className="text-2xl font-black text-white" style={{ fontFamily: "Sora", letterSpacing: "-0.5px" }}>
-                          Manager Championship
-                        </h2>
-                      </div>
-                      <p className="text-sm" style={{ color: "rgba(168,216,234,0.7)" }}>
-                        Classé par taux de réussite J+30 · Score = 60% taux + 40% progression équipe
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-center px-4 py-2 rounded-2xl"
-                        style={{ background: "rgba(0,174,239,0.12)", border: "1px solid rgba(0,174,239,0.2)" }}>
-                        <p className="text-2xl font-black text-white" style={{ fontFamily: "Sora" }}>
-                          {meilleursManagers.length}
-                        </p>
-                        <p className="text-xs" style={{ color: "rgba(168,216,234,0.6)" }}>managers</p>
-                      </div>
-                      <div className="text-center px-4 py-2 rounded-2xl"
-                        style={{ background: "rgba(141,198,63,0.12)", border: "1px solid rgba(141,198,63,0.2)" }}>
-                        <p className="text-2xl font-black" style={{ color: C.green, fontFamily: "Sora" }}>
-                          {Math.round(meilleursManagers.reduce((a, m) => a + m.taux, 0) / meilleursManagers.length)}%
-                        </p>
-                        <p className="text-xs" style={{ color: "rgba(168,216,234,0.6)" }}>taux moyen</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Podium visuel ── */}
-                {meilleursManagers.length >= 1 && (
-                  <div className="relative rounded-3xl p-8 mb-6 overflow-hidden"
-                    style={{
-                      background: C.surface,
-                      border: `1px solid ${C.border}`,
-                    }}>
-
-                    {/* Spotlight radial behind podium */}
-                    <div className="absolute inset-0 pointer-events-none"
-                      style={{
-                        background: "radial-gradient(ellipse 60% 50% at 50% 100%, rgba(245,158,11,0.06) 0%, transparent 70%)",
-                      }} />
-
-                    <div className="relative flex items-end justify-center gap-4" style={{ minHeight: 280 }}>
-
-                      {/* ── 2nd place ── */}
-                      {meilleursManagers[1] ? (
-                        <div className="flex flex-col items-center" style={{ width: 160 }}>
-                          {/* Crown area */}
-                          <div className="mb-2 text-2xl">🥈</div>
-                          {/* Avatar with ring */}
-                          <div className="relative mb-3">
-                            <div className="w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-lg"
-                              style={{
-                                background: "linear-gradient(135deg, #94a3b8, #64748b)",
-                                boxShadow: "0 0 0 3px #94a3b830, 0 4px 20px #94a3b840",
-                              }}>
-                              {meilleursManagers[1].mgr.prenom?.[0]}{meilleursManagers[1].mgr.nom?.[0]}
-                            </div>
-                            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-black text-white"
-                              style={{ background: "#64748b" }}>2</div>
-                          </div>
-                          <p className="text-sm font-bold text-center leading-tight mb-1" style={{ color: C.text }}>
-                            {meilleursManagers[1].mgr.prenom}<br />{meilleursManagers[1].mgr.nom}
-                          </p>
-                          <p className="text-xs mb-3" style={{ color: C.muted }}>
-                            {meilleursManagers[1].teamSize} membres
-                          </p>
-                          {/* Score badge */}
-                          <div className="w-full rounded-2xl py-3 px-4 text-center mb-0"
-                            style={{ background: "#f1f5f9", border: "2px solid #94a3b8" }}>
-                            <p className="text-2xl font-black" style={{ color: "#64748b", fontFamily: "Sora" }}>
-                              {meilleursManagers[1].taux}%
-                            </p>
-                            <p className="text-xs font-medium" style={{ color: "#94a3b8" }}>réussite J+30</p>
-                            <div className="flex items-center justify-center gap-1 mt-1.5">
-                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: "#e2e8f0" }}>
-                                <div className="h-full rounded-full" style={{ width: `${meilleursManagers[1].progMoy}%`, background: "#94a3b8" }} />
-                              </div>
-                              <span className="text-xs flex-shrink-0" style={{ color: "#94a3b8" }}>{meilleursManagers[1].progMoy}%</span>
-                            </div>
-                          </div>
-                          {/* Podium block */}
-                          <div className="w-full rounded-t-2xl flex items-center justify-center"
-                            style={{
-                              height: 80,
-                              background: "linear-gradient(180deg, #94a3b8 0%, #64748b 100%)",
-                              boxShadow: "0 -4px 20px #94a3b830",
-                            }}>
-                            <span className="text-white font-black text-xl opacity-30" style={{ fontFamily: "Sora" }}>2</span>
-                          </div>
-                        </div>
-                      ) : <div style={{ width: 160 }} />}
-
-                      {/* ── 1st place ── */}
-                      <div className="flex flex-col items-center" style={{ width: 180 }}>
-                        {/* Animated crown */}
-                        <div className="mb-1 text-3xl" style={{ filter: "drop-shadow(0 0 8px #f59e0b80)" }}>👑</div>
-                        <div className="mb-2 text-sm font-bold px-3 py-1 rounded-full"
-                          style={{ background: "rgba(245,158,11,0.15)", color: C.amber, border: "1px solid rgba(245,158,11,0.3)" }}>
-                          #1 MEILLEUR MANAGER
-                        </div>
-                        {/* Avatar with glow */}
-                        <div className="relative mb-3">
-                          <div className="absolute inset-0 rounded-full blur-lg scale-110"
-                            style={{ background: "rgba(245,158,11,0.4)" }} />
-                          <div className="relative w-16 h-16 rounded-full flex items-center justify-center text-white font-black text-xl"
-                            style={{
-                              background: `linear-gradient(135deg, ${C.amber}, #d97706)`,
-                              boxShadow: `0 0 0 3px ${C.amber}40, 0 8px 32px ${C.amber}50`,
-                            }}>
-                            {meilleursManagers[0].mgr.prenom?.[0]}{meilleursManagers[0].mgr.nom?.[0]}
-                          </div>
-                          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black text-white"
-                            style={{ background: `linear-gradient(135deg, ${C.amber}, #d97706)` }}>1</div>
-                        </div>
-                        <p className="text-base font-black text-center leading-tight mb-1" style={{ color: C.text, fontFamily: "Sora" }}>
-                          {meilleursManagers[0].mgr.prenom}<br />{meilleursManagers[0].mgr.nom}
-                        </p>
-                        <p className="text-xs mb-3" style={{ color: C.muted }}>
-                          {meilleursManagers[0].teamSize} membres
-                        </p>
-                        {/* Score badge */}
-                        <div className="w-full rounded-2xl py-4 px-4 text-center mb-0"
-                          style={{
-                            background: "linear-gradient(135deg, #fffbeb, #fef3c7)",
-                            border: `2px solid ${C.amber}`,
-                            boxShadow: `0 4px 20px ${C.amber}20`,
-                          }}>
-                          <p className="text-3xl font-black" style={{ color: C.amber, fontFamily: "Sora" }}>
-                            {meilleursManagers[0].taux}%
-                          </p>
-                          <p className="text-xs font-bold" style={{ color: "#d97706" }}>réussite J+30</p>
-                          <p className="text-xs mt-1" style={{ color: C.muted }}>
-                            {meilleursManagers[0].terminesEnTemps}/{meilleursManagers[0].total} parcours terminés
-                          </p>
-                          <div className="flex items-center gap-1 mt-2">
-                            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#fde68a" }}>
-                              <div className="h-full rounded-full" style={{ width: `${meilleursManagers[0].progMoy}%`, background: C.amber }} />
-                            </div>
-                            <span className="text-xs font-bold" style={{ color: C.amber }}>{meilleursManagers[0].progMoy}%</span>
-                          </div>
-                        </div>
-                        {/* Podium block — tallest */}
-                        <div className="w-full rounded-t-2xl flex items-center justify-center"
-                          style={{
-                            height: 120,
-                            background: `linear-gradient(180deg, ${C.amber} 0%, #d97706 100%)`,
-                            boxShadow: `0 -8px 32px ${C.amber}40`,
-                          }}>
-                          <span className="text-white font-black text-3xl opacity-30" style={{ fontFamily: "Sora" }}>1</span>
-                        </div>
-                      </div>
-
-                      {/* ── 3rd place ── */}
-                      {meilleursManagers[2] ? (
-                        <div className="flex flex-col items-center" style={{ width: 160 }}>
-                          <div className="mb-2 text-2xl">🥉</div>
-                          <div className="relative mb-3">
-                            <div className="w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-lg"
-                              style={{
-                                background: "linear-gradient(135deg, #cd7f32, #a0522d)",
-                                boxShadow: "0 0 0 3px #cd7f3230, 0 4px 20px #cd7f3240",
-                              }}>
-                              {meilleursManagers[2].mgr.prenom?.[0]}{meilleursManagers[2].mgr.nom?.[0]}
-                            </div>
-                            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-black text-white"
-                              style={{ background: "#a0522d" }}>3</div>
-                          </div>
-                          <p className="text-sm font-bold text-center leading-tight mb-1" style={{ color: C.text }}>
-                            {meilleursManagers[2].mgr.prenom}<br />{meilleursManagers[2].mgr.nom}
-                          </p>
-                          <p className="text-xs mb-3" style={{ color: C.muted }}>
-                            {meilleursManagers[2].teamSize} membres
-                          </p>
-                          <div className="w-full rounded-2xl py-3 px-4 text-center mb-0"
-                            style={{ background: "#fdf6ec", border: "2px solid #cd7f32" }}>
-                            <p className="text-2xl font-black" style={{ color: "#cd7f32", fontFamily: "Sora" }}>
-                              {meilleursManagers[2].taux}%
-                            </p>
-                            <p className="text-xs font-medium" style={{ color: "#a0522d" }}>réussite J+30</p>
-                            <div className="flex items-center justify-center gap-1 mt-1.5">
-                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: "#f5e6d3" }}>
-                                <div className="h-full rounded-full" style={{ width: `${meilleursManagers[2].progMoy}%`, background: "#cd7f32" }} />
-                              </div>
-                              <span className="text-xs flex-shrink-0" style={{ color: "#cd7f32" }}>{meilleursManagers[2].progMoy}%</span>
-                            </div>
-                          </div>
-                          <div className="w-full rounded-t-2xl flex items-center justify-center"
-                            style={{
-                              height: 50,
-                              background: "linear-gradient(180deg, #cd7f32 0%, #a0522d 100%)",
-                              boxShadow: "0 -4px 20px #cd7f3230",
-                            }}>
-                            <span className="text-white font-black text-xl opacity-30" style={{ fontFamily: "Sora" }}>3</span>
-                          </div>
-                        </div>
-                      ) : <div style={{ width: 160 }} />}
-                    </div>
-
-                    {/* Stage floor */}
-                    <div className="w-full h-3 rounded-b-xl -mt-0"
-                      style={{ background: `linear-gradient(to right, ${C.border}, rgba(0,174,239,0.15), ${C.border})` }} />
-                  </div>
-                )}
-
-                {/* ── Full leaderboard ── */}
-                <div className="card overflow-hidden">
-                  <div className="px-6 py-4 flex items-center justify-between"
-                    style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <div>
-                      <h2 className="text-base font-bold" style={{ color: C.text, fontFamily: "Sora" }}>
-                        Classement complet
-                      </h2>
-                      <p className="text-xs mt-0.5" style={{ color: C.muted }}>
-                        Score global = 60% taux de réussite J+30 + 40% progression moyenne équipe
-                      </p>
-                    </div>
-                  </div>
-                  <div style={{ overflowX: "auto" }}>
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr style={{ borderBottom: `1px solid ${C.border}`, background: C.bg }}>
-                          {["Rang", "Manager", "Équipe", "Terminés J+30", "Taux réussite", "Progression moy.", "Score global"].map((h) => (
-                            <th key={h} className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide"
-                              style={{ color: C.muted }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {meilleursManagers.map((item, idx) => {
-                          const medals = ["🥇", "🥈", "🥉"];
-                          const medal = idx < 3 ? medals[idx] : null;
-                          const tauxColor = item.taux >= 80 ? C.green : item.taux >= 50 ? C.amber : C.rose;
-                          const scoreGlobal = Math.round((item.taux * 0.6) + (item.progMoy * 0.4));
-                          const scoreColor = scoreGlobal >= 80 ? C.green : scoreGlobal >= 50 ? C.cyan : C.amber;
-                          const rowBg = idx === 0 ? "rgba(245,158,11,0.04)" : "transparent";
-                          return (
-                            <tr key={item.mgr.id}
-                              style={{ borderBottom: `1px solid ${C.border}`, background: rowBg }}
-                              onMouseEnter={(e) => { e.currentTarget.style.background = C.bg; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.background = rowBg; }}>
-                              <td className="px-5 py-4">
-                                {medal ? (
-                                  <span className="text-xl">{medal}</span>
-                                ) : (
-                                  <span className="text-sm font-bold tabular-nums" style={{ color: C.muted }}>#{idx + 1}</span>
-                                )}
-                              </td>
-                              <td className="px-5 py-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                                    style={{
-                                      background: idx === 0
-                                        ? `linear-gradient(135deg, ${C.amber}, #d97706)`
-                                        : `linear-gradient(135deg, ${C.violet}, ${C.navy})`,
-                                      boxShadow: idx === 0 ? `0 0 12px ${C.amber}40` : "none",
-                                    }}>
-                                    {item.mgr.prenom?.[0]}{item.mgr.nom?.[0]}
-                                  </div>
-                                  <div>
-                                    <p className="font-semibold" style={{ color: C.text }}>
-                                      {item.mgr.prenom} {item.mgr.nom}
-                                    </p>
-                                    <p className="text-xs" style={{ color: C.muted }}>{item.mgr.email}</p>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-5 py-4">
-                                <span className="text-xs font-bold px-2.5 py-1 rounded-full"
-                                  style={{ background: "#e0f7ff", color: C.cyan }}>
-                                  {item.teamSize} membres
-                                </span>
-                              </td>
-                              <td className="px-5 py-4">
-                                <span className="font-bold tabular-nums" style={{ color: C.green, fontFamily: "Sora" }}>
-                                  {item.terminesEnTemps}
-                                </span>
-                                <span className="text-xs ml-1" style={{ color: C.muted }}>/ {item.total}</span>
-                              </td>
-                              <td className="px-5 py-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-24 h-2 rounded-full overflow-hidden" style={{ background: C.border }}>
-                                    <div className="h-full rounded-full transition-all duration-700"
-                                      style={{ width: `${item.taux}%`, background: tauxColor }} />
-                                  </div>
-                                  <span className="text-sm font-bold tabular-nums w-10" style={{ color: tauxColor, fontFamily: "Sora" }}>
-                                    {item.taux}%
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-5 py-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-16 h-2 rounded-full overflow-hidden" style={{ background: C.border }}>
-                                    <div className="h-full rounded-full"
-                                      style={{ width: `${item.progMoy}%`, background: `linear-gradient(to right, ${C.cyan}, ${C.navy})` }} />
-                                  </div>
-                                  <span className="text-xs font-semibold w-8" style={{ color: C.cyan }}>
-                                    {item.progMoy}%
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-5 py-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0"
-                                    style={{
-                                      background: `linear-gradient(135deg, ${scoreColor}, ${scoreColor}cc)`,
-                                      boxShadow: `0 2px 8px ${scoreColor}40`,
-                                    }}>
-                                    {scoreGlobal}
-                                  </div>
-                                  <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: C.border }}>
-                                    <div className="h-full rounded-full"
-                                      style={{ width: `${scoreGlobal}%`, background: scoreColor }} />
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
+              <ManagerChampionship managers={meilleursManagers} />
             </>
           )}
 

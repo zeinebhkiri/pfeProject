@@ -1,9 +1,11 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface SidebarProps {
   role: "ADMIN" | "SALARIE" | "MANAGER";
+  mobileOpen?: boolean;
+  onClose?: () => void;
 }
 
 const adminLinks = [
@@ -20,21 +22,9 @@ const adminLinks = [
     ),
   },
   {
-    label: "Équipe ",
+    label: "Équipe IT",
     isGroup: true,
     children: [
-      {
-    label: "Annuaire",        
-    to: "/equipe",            
-    icon: (                   
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-      </svg>
-    ),
-  },
       {
         label: "Salariés",
         to: "/admin/salaries",
@@ -59,6 +49,18 @@ const adminLinks = [
       },
     ],
   },
+    {
+    label: "Annuaire",
+    to: "/equipe",
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+    ),
+  },
   {
     label: "Analytics",
     to: "/admin/analytics",
@@ -80,33 +82,38 @@ const adminLinks = [
       </svg>
     ),
   },
-   {
+  {
     label: "Postes",
     to: "/admin/postes",
-    icon: ( <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg> ),
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="2" y="7" width="20" height="14" rx="2"/>
+        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+      </svg>
+    ),
   },
   {
-  label: "Parcours",
-  to: "/admin/parcours",
-  icon: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M9 11l3 3L22 4"/>
-      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-    </svg>
-  ),
-},
-{
-  label: "Suivi parcours",
-  to: "/admin/suivi-parcours",
-  icon: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <line x1="18" y1="20" x2="18" y2="10"/>
-      <line x1="12" y1="20" x2="12" y2="4"/>
-      <line x1="6" y1="20" x2="6" y2="14"/>
-    </svg>
-  ),
-}, 
- {
+    label: "Parcours",
+    to: "/admin/parcours",
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M9 11l3 3L22 4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+    ),
+  },
+  {
+    label: "Suivi parcours",
+    to: "/admin/suivi-parcours",
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="18" y1="20" x2="18" y2="10"/>
+        <line x1="12" y1="20" x2="12" y2="4"/>
+        <line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+    ),
+  },
+  {
     label: "Archives",
     isGroup: true,
     children: [
@@ -119,7 +126,7 @@ const adminLinks = [
           </svg>
         ),
       },
-       {
+      {
         label: "Anciens collaborateurs",
         to: "/admin/archives/anciens",
         icon: (
@@ -133,22 +140,25 @@ const adminLinks = [
         ),
       },
       {
-  label: "Modèles archivés",
-  to: "/admin/archives/parcours-templates",
-  icon: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M4 4v16h16V4H4z M8 9h8 M8 13h6"/>
-    </svg>
-  ),
-},
- {
-      label: "Postes archivés",
-      to: "/admin/archives/postes",
-      icon: ( <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4v16h16V4H4z M8 9h8 M8 13h6"/></svg> ),
-    },
+        label: "Modèles archivés",
+        to: "/admin/archives/parcours-templates",
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 4v16h16V4H4z M8 9h8 M8 13h6"/>
+          </svg>
+        ),
+      },
+      {
+        label: "Postes archivés",
+        to: "/admin/archives/postes",
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 4v16h16V4H4z M8 9h8 M8 13h6"/>
+          </svg>
+        ),
+      },
     ],
   },
-
 ];
 
 const salarieLinks = [
@@ -164,45 +174,35 @@ const salarieLinks = [
       </svg>
     ),
   },
-  {
-  label: "Mon parcours",
-  to: "/parcours",
-  icon: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M9 11l3 3L22 4"/>
-      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-    </svg>
-  ),
-},
-  {
-  label: "Mon profil",
-  to: "/profile",
-  icon: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-      <circle cx="12" cy="7" r="4"/>
-    </svg>
-  ),
-},
- {
-    label: "Annuaire",        // ✅ AJOUTER
-    to: "/equipe",            // ✅ AJOUTER
-    icon: (                   // ✅ AJOUTER
+      {
+    label: "Annuaire",
+    to: "/equipe",
+    icon: (
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
       </svg>
     ),
   },
   {
-    label: "Évaluation",
-    to: "/feedback",
+    label: "Mon parcours",
+    to: "/parcours",
     icon: (
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5"/>
-        <path d="M17.5 2.5a2.121 2.121 0 0 1 3 3L12 14l-4 1 1-4 8.5-8.5z"/>
+        <path d="M9 11l3 3L22 4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+    ),
+  },
+  {
+    label: "Mon profil",
+    to: "/profile",
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
       </svg>
     ),
   },
@@ -239,27 +239,38 @@ const managerLinks = [
       },
     ],
   },
+      {
+    label: "Annuaire",
+    to: "/equipe",
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+    ),
+  },
   {
-  label: "Parcours équipe",
-  to: "/manager/parcours",
-  icon: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M9 11l3 3L22 4"/>
-      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-    </svg>
-  ),
-},
-// ← Mon parcours personnel
-{
-  label: "Mon parcours",
-  to: "/parcours",
-  icon: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10"/>
-      <polyline points="12 6 12 12 16 14"/>
-    </svg>
-  ),
-},
+    label: "Parcours équipe",
+    to: "/manager/parcours",
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M9 11l3 3L22 4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+    ),
+  },
+  {
+    label: "Mon parcours",
+    to: "/parcours",
+    icon: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+    ),
+  },
   {
     label: "Analytics",
     to: "/manager/analytics",
@@ -269,57 +280,32 @@ const managerLinks = [
       </svg>
     ),
   },
-   {
-  label: "Mon profil",
-  to: "/profile",
-  icon: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-      <circle cx="12" cy="7" r="4"/>
-    </svg>
-  ),
-},
- {
-    label: "Annuaire",        // ✅ AJOUTER
-    to: "/equipe",            // ✅ AJOUTER
-    icon: (                   // ✅ AJOUTER
+  {
+    label: "Mon profil",
+    to: "/profile",
+    icon: (
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
       </svg>
     ),
   },
-  {
-  label: "🏆 Classement",
-  to: "/manager/leaderboard",
-  icon: (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <line x1="18" y1="20" x2="18" y2="10"/>
-      <line x1="12" y1="20" x2="12" y2="4"/>
-      <line x1="6" y1="20" x2="6" y2="14"/>
-    </svg>
-  ),
-},
 ];
 
-/* ── Logo Square IT ── */
 const SquareITLogo = ({ collapsed }: { collapsed: boolean }) => (
   <div className={`flex items-center gap-3 transition-all duration-300 ${collapsed ? "justify-center" : ""}`}>
     <div className="relative flex-shrink-0 w-9 h-9">
-      {/* Simplified geometric logo mark inspired by Square IT */}
       <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-9 h-9">
-        <rect x="2" y="2" width="14" height="14" rx="2" fill="#00AEEF" opacity="0.9"/>
-        <rect x="20" y="2" width="14" height="14" rx="2" fill="#8DC63F" opacity="0.9"/>
-        <rect x="2" y="20" width="14" height="14" rx="2" fill="#A8D8EA" opacity="0.7"/>
+        <rect x="2"  y="2"  width="14" height="14" rx="2" fill="#00AEEF" opacity="0.9"/>
+        <rect x="20" y="2"  width="14" height="14" rx="2" fill="#8DC63F" opacity="0.9"/>
+        <rect x="2"  y="20" width="14" height="14" rx="2" fill="#A8D8EA" opacity="0.7"/>
         <rect x="20" y="20" width="14" height="14" rx="2" fill="#00AEEF" opacity="0.5"/>
       </svg>
     </div>
     {!collapsed && (
       <div>
         <p className="text-white font-bold text-sm leading-tight" style={{ fontFamily: "Sora" }}>
-          SQUARE <span style={{ color: "#00AEEF" }}>IT</span>
+          Onboard <span style={{ color: "#00AEEF" }}>Pro</span>
         </p>
         <p className="text-xs font-medium" style={{ color: "rgba(168,216,234,0.6)", letterSpacing: "0.08em" }}>
           CONSULTING
@@ -329,38 +315,41 @@ const SquareITLogo = ({ collapsed }: { collapsed: boolean }) => (
   </div>
 );
 
-const Sidebar = ({ role }: SidebarProps) => {
+// ─── Contenu interne de la sidebar (partagé desktop + mobile) ────────────────
+const SidebarContent = ({
+  role,
+  collapsed,
+  setCollapsed,
+  onLinkClick,
+}: {
+  role: "ADMIN" | "SALARIE" | "MANAGER";
+  collapsed: boolean;
+  setCollapsed: (v: boolean) => void;
+  onLinkClick?: () => void;
+}) => {
   const { logout, email } = useAuth();
   const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState(false);
 
   const links =
     role === "ADMIN" ? adminLinks :
     role === "MANAGER" ? managerLinks :
     salarieLinks;
 
-  const w = collapsed ? "var(--sidebar-collapsed)" : "var(--sidebar-w)";
-
   return (
-    <aside
-      className="fixed top-0 left-0 h-screen flex-col transition-all duration-300 z-40 hidden md:flex"
-      style={{
-        width: w,
-        background: "linear-gradient(180deg, #0D1B3E 0%, #1A2B6B 60%, #111D4A 100%)",
-        borderRight: "1px solid rgba(0,174,239,0.12)",
-      }}
-    >
-      {/* Top decoration line */}
-      <div className="h-0.5 w-full" style={{ background: "linear-gradient(90deg, #00AEEF, #8DC63F, transparent)" }} />
+    <>
+      {/* Top decoration */}
+      <div className="h-0.5 w-full flex-shrink-0"
+        style={{ background: "linear-gradient(90deg, #00AEEF, #8DC63F, transparent)" }} />
 
-      {/* Logo + toggle */}
-      <div className={`flex items-center border-b py-4 transition-all duration-300 ${
+      {/* Logo + toggle collapse (desktop seulement) */}
+      <div className={`flex items-center border-b py-4 flex-shrink-0 transition-all duration-300 ${
         collapsed ? "px-3 justify-center" : "px-5 justify-between"
       }`} style={{ borderColor: "rgba(0,174,239,0.12)" }}>
         <SquareITLogo collapsed={collapsed} />
+        {/* Bouton collapse — caché sur mobile */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className={`text-slate-400 hover:text-white transition p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0 ${collapsed ? "mt-2" : ""}`}
+          className="hidden md:flex text-slate-400 hover:text-white transition p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0"
           title={collapsed ? "Agrandir" : "Réduire"}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -373,14 +362,15 @@ const Sidebar = ({ role }: SidebarProps) => {
 
       {/* Role badge */}
       {!collapsed && (
-        <div className="mx-4 mt-4 mb-1 px-3 py-2 rounded-lg" style={{ background: "rgba(0,174,239,0.08)", border: "1px solid rgba(0,174,239,0.15)" }}>
+        <div className="mx-4 mt-4 mb-1 px-3 py-2 rounded-lg flex-shrink-0"
+          style={{ background: "rgba(0,174,239,0.08)", border: "1px solid rgba(0,174,239,0.15)" }}>
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#00AEEF" }}>
             {role === "ADMIN" ? "RH / Admin" : role === "MANAGER" ? "Manager" : "Employé"}
           </p>
         </div>
       )}
 
-      {/* Nav links */}
+      {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
         {links.map((item: any) => {
           if (item.isGroup) {
@@ -398,6 +388,7 @@ const Sidebar = ({ role }: SidebarProps) => {
                   <NavLink
                     key={child.to}
                     to={child.to}
+                    onClick={onLinkClick}
                     className={({ isActive }) =>
                       `sidebar-link ${isActive ? "active" : ""} ${collapsed ? "justify-center px-0" : ""}`
                     }
@@ -415,6 +406,7 @@ const Sidebar = ({ role }: SidebarProps) => {
               key={item.to}
               to={item.to}
               end={item.to === "/admin" || item.to === "/manager" || item.to === "/dashboard"}
+              onClick={onLinkClick}
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""} ${collapsed ? "justify-center px-0" : ""}`
               }
@@ -428,9 +420,11 @@ const Sidebar = ({ role }: SidebarProps) => {
       </nav>
 
       {/* User info + Logout */}
-      <div className="px-2 py-3 space-y-1" style={{ borderTop: "1px solid rgba(0,174,239,0.12)" }}>
+      <div className="px-2 py-3 space-y-1 flex-shrink-0"
+        style={{ borderTop: "1px solid rgba(0,174,239,0.12)" }}>
         {!collapsed && (
-          <div className="px-3 py-2.5 rounded-xl mb-2" style={{ background: "rgba(255,255,255,0.04)" }}>
+          <div className="px-3 py-2.5 rounded-xl mb-2"
+            style={{ background: "rgba(255,255,255,0.04)" }}>
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                 style={{ background: "linear-gradient(135deg, #00AEEF, #1A2B6B)" }}>
@@ -459,7 +453,89 @@ const Sidebar = ({ role }: SidebarProps) => {
           {!collapsed && <span>Déconnexion</span>}
         </button>
       </div>
-    </aside>
+    </>
   );
 };
+
+// ─── Sidebar principale ───────────────────────────────────────────────────────
+const Sidebar = ({ role, mobileOpen = false, onClose }: SidebarProps) => {
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Ferme le drawer mobile lors du changement de route
+  // et bloque le scroll body quand le drawer est ouvert
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
+
+  const sidebarStyle = {
+    background: "linear-gradient(180deg, #0D1B3E 0%, #1A2B6B 60%, #111D4A 100%)",
+    borderRight: "1px solid rgba(0,174,239,0.12)",
+  };
+
+  return (
+    <>
+      {/* ── Version DESKTOP — fixe, toujours visible ── */}
+      <aside
+        className="fixed top-0 left-0 h-screen flex-col transition-all duration-300 z-40 hidden md:flex"
+        style={{
+          ...sidebarStyle,
+          width: collapsed ? "var(--sidebar-collapsed)" : "var(--sidebar-w)",
+        }}
+      >
+        <SidebarContent
+          role={role}
+          collapsed={collapsed}
+          setCollapsed={setCollapsed}
+        />
+      </aside>
+
+      {/* ── Version MOBILE — drawer par-dessus le contenu ── */}
+      {/* Overlay semi-transparent */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-50 md:hidden"
+          style={{ background: "rgba(0,0,0,0.55)" }}
+          onClick={onClose}
+          aria-label="Fermer le menu"
+        />
+      )}
+
+      {/* Panneau drawer */}
+      <aside
+        className="fixed top-0 left-0 h-screen flex flex-col z-50 md:hidden transition-transform duration-300"
+        style={{
+          ...sidebarStyle,
+          width: "var(--sidebar-w)",
+          transform: mobileOpen ? "translateX(0)" : "translateX(-100%)",
+        }}
+      >
+        {/* Bouton fermer en haut du drawer */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+          style={{ background: "rgba(255,255,255,0.08)", color: "rgba(168,216,234,0.7)" }}
+          aria-label="Fermer"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+
+        <SidebarContent
+          role={role}
+          collapsed={false}
+          setCollapsed={() => {}}
+          onLinkClick={onClose}
+        />
+      </aside>
+    </>
+  );
+};
+
 export default Sidebar;

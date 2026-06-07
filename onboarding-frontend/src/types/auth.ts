@@ -252,3 +252,68 @@ export interface ParcoursAvecTasks {
   parcours: Parcours;
   tasks: Task[];
 }
+// ─── Archive parcours ────────────────────────────────────────────────────────
+
+export interface TacheArchivee {
+  taskOriginalId: string;
+  titre: string;
+  description?: string;
+  taskType: TaskType;
+  typeActeurs: TypeActeur[];
+  ordre: number;
+  obligatoire: boolean;
+  phase?: string;
+  statut: string;
+  echeance?: string;
+  dateCompletion?: string;
+  scoreObtenu: number;
+  nbTentatives: number;
+  progression: number;
+  documentNom?: string;
+  completeDansLesDelais: boolean;
+}
+
+export interface ArchiveParcours {
+  id: string;
+  // Identifiants
+  userId: string;
+  parcoursOriginalId: string;
+  positionId: string;
+  managerId?: string;
+  // Identité figée
+  nomSalarie: string;
+  emailSalarie: string;
+  titrePoste: string;
+  nomManager: string;
+  emailManager?: string;
+  // Dates du poste
+  dateEmbauche?: string;
+  datePriseDePoste?: string;
+  dateFinPoste: string;
+  // Données du parcours
+  dateDebutParcours: string;
+  dateFinParcours: string;
+  progressionFinale: number;
+  statutFinal: string;
+  // Statistiques
+  nombreTachesTotal: number;
+  nombreTachesTerminees: number;
+  nombreTachesObligatoires: number;
+  nombreTachesObligatoiresTerminees: number;
+  scoreTotalObtenu: number;
+  // Tâches figées
+  taches: TacheArchivee[];
+  // Méta
+  dateArchivage: string;
+  motifArchivage: string;
+  nouveauPosteId?: string;
+  titreNouveauPoste?: string;
+}
+
+export interface EligibiliteChangementPoste {
+  eligible: boolean;
+  hasAffectation: boolean;
+  progression?: number;
+  statutParcours?: string;
+  raison: string;
+}

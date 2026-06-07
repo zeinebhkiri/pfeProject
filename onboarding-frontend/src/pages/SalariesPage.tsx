@@ -73,6 +73,7 @@ const SalariesPage = () => {
                 <span className="text-sm">Aucun salarié trouvé</span>
               </div>
             ) : (
+              <div className="table-responsive"> 
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: `1px solid var(--border)` }}>
@@ -133,6 +134,7 @@ const SalariesPage = () => {
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>

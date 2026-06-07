@@ -116,7 +116,7 @@ if (task.commentaires && task.commentaires.length > 0) {
 
     // ── 4. Quiz débloqué (dateOuverture passée récemment, tâche NON_COMMENCE) ──
     if (
-      task.taskType === "QUIZ" &&
+      task.taskType === "QUIZ" && 
       task.dateOuverture &&
       task.statut === "NON_COMMENCE"
     ) {
@@ -129,7 +129,7 @@ if (task.commentaires && task.commentaires.length > 0) {
         notifs.push({
           id,
           type: "QUIZ_UNLOCKED",
-          title: "Quiz débloqué",
+          title: "Quiz déverrouillé",
           message: `Le quiz « ${task.titre} » est maintenant disponible. À vous de jouer !`,
           taskId: task.id,
           timestamp: ouverture,

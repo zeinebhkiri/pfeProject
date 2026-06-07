@@ -12,6 +12,8 @@ import {
   deleteTaskTemplateApi,
   reorderTaskTemplatesApi,
   getPositionsApi,
+  getTemplatesSalariesActifsApi,
+  applyTemplateToUsersApi,
 } from "../api/authApi";
 import {
   type ParcoursTemplate,
@@ -77,6 +79,14 @@ const AdminParcoursTemplatesPage = () => {
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Propagation modal
+  const [showPropagateModal, setShowPropagateModal] = useState(false);
+  const [propagateTemplateId, setPropagateTemplateId] = useState<string | null>(null);
+  const [propagateSalaries, setPropagateSalaries] = useState<{ userId: string; prenom: string; nom: string; email: string; progression: number }[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [propagateLoading, setPropagateLoading] = useState(false);
+  const [propagateResult, setPropagateResult] = useState<{ applied: number; errors: string[] } | null>(null);
+
   // Drag & drop
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -136,13 +146,31 @@ const [searchTerm, setSearchTerm] = useState("");
   });
 
   // ── Mutations Tasks ───────────────────────────────────────────────
+  // Helper: open propagate modal after a task change
+  const openPropagateModal = async (templateId: string) => {
+    setPropagateTemplateId(templateId);
+    setPropagateResult(null);
+    setPropagateLoading(true);
+    setShowPropagateModal(true);
+    try {
+      const sal = await getTemplatesSalariesActifsApi(templateId);
+      setPropagateSalaries(sal);
+      setSelectedUserIds(new Set(sal.map(s => s.userId)));
+    } catch {
+      setPropagateSalaries([]);
+    } finally {
+      setPropagateLoading(false);
+    }
+  };
+
   const createTaskMutation = useMutation({
     mutationFn: ({ ptId, data }: { ptId: string; data: Partial<TaskTemplate> }) =>
       createTaskTemplateApi(ptId, data),
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["taskTemplates", selectedTemplate?.id] });
       setSuccessMsg("Tâche ajoutée !");
       closeTaskModal();
+      if (selectedTemplate?.id) openPropagateModal(selectedTemplate.id);
     },
     onError: (e: any) => setErrorMsg(e.response?.data?.error || "Erreur ajout tâche."),
   });
@@ -150,20 +178,22 @@ const [searchTerm, setSearchTerm] = useState("");
   const updateTaskMutation = useMutation({
     mutationFn: ({ ptId, taskId, data }: { ptId: string; taskId: string; data: Partial<TaskTemplate> }) =>
       updateTaskTemplateApi(ptId, taskId, data),
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["taskTemplates", selectedTemplate?.id] });
       setSuccessMsg("Tâche modifiée !");
       closeTaskModal();
+      if (selectedTemplate?.id) openPropagateModal(selectedTemplate.id);
     },
   });
 
   const deleteTaskMutation = useMutation({
     mutationFn: ({ ptId, taskId }: { ptId: string; taskId: string }) =>
       deleteTaskTemplateApi(ptId, taskId),
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["taskTemplates", selectedTemplate?.id] });
       setDeleteTaskId(null);
       setSuccessMsg("Tâche supprimée !");
+      if (selectedTemplate?.id) openPropagateModal(selectedTemplate.id);
     },
   });
 
@@ -1251,6 +1281,176 @@ const filteredTemplates = (templates as ParcoursTemplate[]).filter(template =>
                   className="btn-secondary flex-1 py-3">Annuler</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* ── Modal Propagation ── */}
+      {showPropagateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => { if (!propagateLoading) { setShowPropagateModal(false); setPropagateResult(null); } }} />
+          <div className="relative rounded-3xl shadow-2xl w-full mx-4 flex flex-col"
+            style={{ background: "var(--surface)", maxWidth: "520px", maxHeight: "80vh", zIndex: 51 }}>
+
+            {/* Header */}
+            <div className="px-7 py-6 flex items-center gap-4 flex-shrink-0"
+              style={{ borderBottom: "1px solid var(--border)", background: "linear-gradient(135deg,#00AEEF15,#1A2B6B08)" }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                style={{ background: "rgba(0,174,239,0.12)", border: "1px solid rgba(0,174,239,0.2)" }}>
+                🔄
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>
+                  Appliquer les modifications
+                </h3>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  Sélectionnez les salariés dont le parcours sera mis à jour
+                </p>
+              </div>
+              <button type="button" onClick={() => { setShowPropagateModal(false); setPropagateResult(null); }}
+                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: "var(--border)", color: "var(--text-muted)" }}>✕</button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 px-7 py-5 space-y-4">
+              {propagateResult ? (
+                <div className="text-center py-6 space-y-4">
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto"
+                    style={{ background: "#ecfdf5" }}>✅</div>
+                  <div>
+                    <p className="text-lg font-bold" style={{ color: "var(--text)", fontFamily: "Sora" }}>
+                      Modifications appliquées
+                    </p>
+                    <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+                      {propagateResult.applied} parcours mis à jour avec succès
+                    </p>
+                  </div>
+                  {propagateResult.errors.length > 0 && (
+                    <div className="rounded-xl px-4 py-3 text-left"
+                      style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+                      <p className="text-xs font-bold text-red-600 mb-1">Erreurs :</p>
+                      {propagateResult.errors.map((e, i) => (
+                        <p key={i} className="text-xs text-red-500">{e}</p>
+                      ))}
+                    </div>
+                  )}
+                  <button type="button"
+                    onClick={() => { setShowPropagateModal(false); setPropagateResult(null); }}
+                    className="btn-primary px-8 py-2.5">Fermer</button>
+                </div>
+              ) : propagateLoading ? (
+                <div className="flex items-center justify-center py-10 gap-3">
+                  <div className="w-6 h-6 border-4 rounded-full animate-spin"
+                    style={{ borderColor: "rgba(0,174,239,0.2)", borderTopColor: "#00AEEF" }} />
+                  <span className="text-sm" style={{ color: "var(--text-muted)" }}>Chargement des salariés...</span>
+                </div>
+              ) : propagateSalaries.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-3xl mb-3">👤</p>
+                  <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
+                    Aucun salarié n'a ce parcours actif
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                    Les modifications seront appliquées aux prochaines affectations.
+                  </p>
+                  <button type="button" onClick={() => { setShowPropagateModal(false); }}
+                    className="btn-secondary px-6 py-2.5 mt-4">Fermer</button>
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-xl px-4 py-3 text-sm flex items-start gap-2"
+                    style={{ background: "rgba(0,174,239,0.06)", border: "1px solid rgba(0,174,239,0.15)" }}>
+                    <span className="flex-shrink-0 mt-0.5">ℹ️</span>
+                    <p style={{ color: "var(--text-muted)" }}>
+                      Les tâches déjà complétées ne seront pas supprimées. Seules les{" "}
+                      <strong style={{ color: "var(--text)" }}>nouvelles tâches</strong> du template seront ajoutées.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                      {propagateSalaries.length} salarié{propagateSalaries.length > 1 ? "s" : ""} avec ce parcours actif
+                    </p>
+                    <button type="button"
+                      onClick={() => selectedUserIds.size === propagateSalaries.length
+                        ? setSelectedUserIds(new Set())
+                        : setSelectedUserIds(new Set(propagateSalaries.map(s => s.userId)))}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                      style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
+                      {selectedUserIds.size === propagateSalaries.length ? "Tout désélectionner" : "Tout sélectionner"}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {propagateSalaries.map(s => {
+                      const checked = selectedUserIds.has(s.userId);
+                      return (
+                        <div key={s.userId}
+                          className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition"
+                          style={{
+                            background: checked ? "rgba(0,174,239,0.06)" : "var(--bg)",
+                            border: `1.5px solid ${checked ? "rgba(0,174,239,0.25)" : "var(--border)"}`,
+                          }}
+                          onClick={() => {
+                            const next = new Set(selectedUserIds);
+                            checked ? next.delete(s.userId) : next.add(s.userId);
+                            setSelectedUserIds(next);
+                          }}>
+                          <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+                            style={{ background: checked ? "#00AEEF" : "var(--surface)", border: `2px solid ${checked ? "#00AEEF" : "var(--border)"}` }}>
+                            {checked && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+                          </div>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                            style={{ background: "linear-gradient(135deg,#00AEEF,#1A2B6B)" }}>
+                            {s.prenom[0]}{s.nom[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>{s.prenom} {s.nom}</p>
+                            <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{s.email}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                            <span className="text-xs font-bold" style={{ color: "#00AEEF" }}>{s.progression}%</span>
+                            <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
+                              <div className="h-full rounded-full" style={{ width: `${s.progression}%`, background: "#00AEEF" }} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            {!propagateResult && !propagateLoading && propagateSalaries.length > 0 && (
+              <div className="px-7 py-5 flex gap-3 flex-shrink-0"
+                style={{ borderTop: "1px solid var(--border)" }}>
+                <button type="button"
+                  disabled={selectedUserIds.size === 0}
+                  onClick={async () => {
+                    if (!propagateTemplateId || selectedUserIds.size === 0) return;
+                    setPropagateLoading(true);
+                    try {
+                      const res = await applyTemplateToUsersApi(propagateTemplateId, Array.from(selectedUserIds));
+                      setPropagateResult(res);
+                    } catch (e: any) {
+                      setErrorMsg(e.response?.data?.error || "Erreur lors de l'application.");
+                      setShowPropagateModal(false);
+                    } finally {
+                      setPropagateLoading(false);
+                    }
+                  }}
+                  className="btn-primary flex-1 py-3 flex items-center justify-center gap-2">
+                  🔄 Appliquer à {selectedUserIds.size} salarié{selectedUserIds.size > 1 ? "s" : ""}
+                </button>
+                <button type="button"
+                  onClick={() => { setShowPropagateModal(false); setPropagateResult(null); }}
+                  className="btn-secondary px-6 py-3">
+                  Ignorer
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

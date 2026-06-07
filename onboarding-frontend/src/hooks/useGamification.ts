@@ -142,6 +142,70 @@ const BADGE_DEFS: BadgeDef[] = [
   },
 ];
 
+
+// ── Helper: compute badges from tasks (usable outside hook) ──────────────────
+export function computeBadgesFromTasks(
+  tasks: Task[],
+  parcours: Parcours | null | undefined
+): { unlockedBadges: Badge[]; markBadgesSeen: (ids: string[]) => void } {
+  const unlockedIds = new Set<string>();
+  const doneTasks = tasks.filter(t => t.statut === "TERMINE");
+
+  if (doneTasks.length >= 1) unlockedIds.add("first_task");
+
+  const firstDocDone = doneTasks.find(t => t.taskType === "FORMATION" || t.taskType === "SIMPLE");
+  if (firstDocDone) unlockedIds.add("first_doc");
+
+  const perfectQuiz = doneTasks.find(t => {
+    if (t.taskType !== "QUIZ" || !t.config?.questions) return false;
+    const max = t.config.questions.reduce((s: number, q: any) => s + q.points, 0);
+    return max > 0 && t.scoreObtenu === max;
+  });
+  if (perfectQuiz) unlockedIds.add("quiz_perfect");
+
+  const earlyTask = doneTasks.find(t => {
+    if (!t.echeance || !t.dateCompletion) return false;
+    return new Date(t.dateCompletion) < new Date(t.echeance);
+  });
+  if (earlyTask) unlockedIds.add("speed_demon");
+
+  const progression = parcours?.progression ?? 0;
+  if (progression >= 50) unlockedIds.add("half_way");
+
+  const passedQuizzes = doneTasks.filter(t => {
+    if (t.taskType !== "QUIZ") return false;
+    const minScore = t.config?.scoreMinimum ?? 0;
+    return (t.scoreObtenu ?? 0) >= minScore;
+  });
+  if (passedQuizzes.length >= 3) unlockedIds.add("quiz_master");
+
+  if (parcours?.statut === "TERMINE") {
+    unlockedIds.add("parcours_done");
+    if (earlyTask) unlockedIds.add("early_bird");
+  }
+
+  const mandatoryTasks = tasks.filter(t => t.obligatoire);
+  const mandatoryDone  = mandatoryTasks.filter(t => t.statut === "TERMINE");
+  if (mandatoryTasks.length > 0 && mandatoryDone.length === mandatoryTasks.length) {
+    unlockedIds.add("all_tasks");
+  }
+
+  const unlockedBadges = BADGE_DEFS
+    .filter(def => unlockedIds.has(def.id))
+    .map(def => ({ ...def, unlocked: true }));
+
+  const markBadgesSeen = (ids: string[]) => {
+    try {
+      const SEEN_KEY = "gamification_seen_badges";
+      const seenIds: string[] = JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]");
+      const updated = Array.from(new Set([...seenIds, ...ids]));
+      localStorage.setItem(SEEN_KEY, JSON.stringify(updated));
+    } catch {}
+  };
+
+  return { unlockedBadges, markBadgesSeen };
+}
+
 // ── Main hook ─────────────────────────────────────────────────────────────────
 export interface GamificationData {
   totalXP: number;
@@ -151,6 +215,8 @@ export interface GamificationData {
   badges: Badge[];
   unlockedBadges: Badge[];
   lockedBadges: Badge[];
+  newlyUnlockedBadges: Badge[]; // badges débloqués depuis la dernière visite
+  markBadgesSeen: (ids: string[]) => void;
 }
 
 export function useGamification(
@@ -286,14 +352,33 @@ export function useGamification(
       progressToNext = Math.min(100, Math.round((earned / range) * 100));
     }
 
+    // ── Nouveaux badges (pas encore vus) ──────────────────────────────────
+    const SEEN_KEY = "gamification_seen_badges";
+    let seenIds: string[] = [];
+    try {
+      seenIds = JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]");
+    } catch { seenIds = []; }
+
+    const allUnlocked = badges.filter(b => b.unlocked);
+    const newlyUnlocked = allUnlocked.filter(b => !seenIds.includes(b.id));
+
+    const markBadgesSeen = (ids: string[]) => {
+      try {
+        const updated = Array.from(new Set([...seenIds, ...ids]));
+        localStorage.setItem(SEEN_KEY, JSON.stringify(updated));
+      } catch {}
+    };
+
     return {
       totalXP: xp,
       level,
       nextLevel,
       progressToNext,
       badges,
-      unlockedBadges: badges.filter((b) => b.unlocked),
+      unlockedBadges: allUnlocked,
       lockedBadges: badges.filter((b) => !b.unlocked),
+      newlyUnlockedBadges: newlyUnlocked,
+      markBadgesSeen,
     };
   }, [tasks, parcours]);
 }

@@ -7,6 +7,7 @@ import { useTheme } from "../context/ThemeContext";
 import { type UserRole, type User , type Affectation, type Position} from "../types/auth";
 import Sidebar from "../components/Sidebar";
 import NotificationBell from "../components/NotificationBell";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
 const statutConfig: Record<string, { label: string; class: string }> = {
   EN_ATTENTE: { label: "En attente", class: "bg-amber-50 text-amber-700 border border-amber-200" },
@@ -23,10 +24,12 @@ interface ToastData {
 }
 
 const AdminDashboardPage = () => {
+
   const navigate = useNavigate();
   const { email } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const queryClient = useQueryClient();
+  const { menuOpen, openMenu, closeMenu } = useResponsiveLayout();
 
   const [dateEmbauche, setDateEmbauche]  = useState(() => {
   const date = new Date();
@@ -167,7 +170,7 @@ const { data: positions = [] } = useQuery({
 
   return (
     <div className="flex min-h-screen" style={{ background: "var(--bg)" }}>
-      <Sidebar role="ADMIN" />
+      <Sidebar role="ADMIN" mobileOpen={menuOpen} onClose={closeMenu}/>
 
       <main className="flex-1 overflow-auto" style={{ marginLeft: "var(--sidebar-w)" }}>
 
@@ -266,7 +269,7 @@ const { data: positions = [] } = useQuery({
           )}
 
           {/* Stats */}
-          <div className="grid grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
             {stats.map((s) => (
               <div key={s.label} className="stat-card flex items-center gap-4">
                 <div className={`w-14 h-14 rounded-2xl ${s.bg} flex items-center justify-center text-2xl flex-shrink-0`}>
@@ -333,6 +336,7 @@ const { data: positions = [] } = useQuery({
     </div>
   ) : (
     <div className="overflow-x-auto">
+      <div className="table-responsive"> 
       <table className="w-full text-sm">
         <thead>
           <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -496,6 +500,7 @@ const userdateEmbauche =
           })}
         </tbody>
       </table>
+      </div>
     </div>
   )}
 </div>

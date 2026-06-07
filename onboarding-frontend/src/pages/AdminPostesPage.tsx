@@ -1,54 +1,64 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
-import { getPositionsApi,createPositionApi, updatePositionApi, deletePositionApi} from "../api/authApi";
+import { getPositionsApi, createPositionApi, updatePositionApi, deletePositionApi, getAllAffectationsApi } from "../api/authApi";
 import { type Position } from "../types/auth";
 import Sidebar from "../components/Sidebar";
 import { useAuth } from "../hooks/useAuth";
 
-
 const AdminPostesPage = () => {
-  const navigate = useNavigate();
   const { role } = useAuth();
   const queryClient = useQueryClient();
 
-  const [showModal, setShowModal] = useState(false);
-  const [editingPoste, setEditingPoste] = useState<Position | null>(null);
-  const [titre, setTitre] = useState("");
-  const [description, setDescription] = useState("");
+  const [showModal, setShowModal]             = useState(false);
+  const [editingPoste, setEditingPoste]       = useState<Position | null>(null);
+  const [titre, setTitre]                     = useState("");
+  const [description, setDescription]         = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [blockedPosteId, setBlockedPosteId]   = useState<string | null>(null);
+  const [successMsg, setSuccessMsg]           = useState("");
+  const [errorMsg, setErrorMsg]               = useState("");
 
+  // ── Queries ────────────────────────────────────────────────────────────────
   const { data: positions = [], isLoading } = useQuery({
     queryKey: ["positions"],
     queryFn: getPositionsApi,
   });
 
+  const { data: allAffectations = [] } = useQuery({
+    queryKey: ["allAffectations"],
+    queryFn: getAllAffectationsApi,
+  });
+
+  // ── Helper : postes occupés ────────────────────────────────────────────────
+  const positionIdsOccupees = new Set(
+    (allAffectations as { positionId: string }[]).map(a => a.positionId)
+  );
+
+  const isOccupe = (positionId: string) => positionIdsOccupees.has(positionId);
+
+  const getNbSalaries = (positionId: string) =>
+    (allAffectations as { positionId: string }[]).filter(a => a.positionId === positionId).length;
+
+  // ── Mutations ──────────────────────────────────────────────────────────────
   const createMutation = useMutation({
-    mutationFn: (data: { titre: string; description: string }) =>
-  createPositionApi(data),
+    mutationFn: (data: { titre: string; description: string }) => createPositionApi(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["positions"] });
       setSuccessMsg("Poste créé avec succès !");
       closeModal();
     },
-    onError: (error: any) => {
-      setErrorMsg(error.response?.data?.error || "Erreur lors de la création.");
-    },
+    onError: (e: any) => setErrorMsg(e.response?.data?.error || "Erreur lors de la création."),
   });
 
   const updateMutation = useMutation({
     mutationFn: (data: { id: string; titre: string; description: string }) =>
-  updatePositionApi(data.id, { titre: data.titre, description: data.description }),
+      updatePositionApi(data.id, { titre: data.titre, description: data.description }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["positions"] });
       setSuccessMsg("Poste modifié avec succès !");
       closeModal();
     },
-    onError: (error: any) => {
-      setErrorMsg(error.response?.data?.error || "Erreur lors de la modification.");
-    },
+    onError: (e: any) => setErrorMsg(e.response?.data?.error || "Erreur lors de la modification."),
   });
 
   const deleteMutation = useMutation({
@@ -58,9 +68,10 @@ const AdminPostesPage = () => {
       setDeleteConfirmId(null);
       setSuccessMsg("Poste désactivé avec succès !");
     },
-    onError: () => setErrorMsg("Erreur lors de la suppression."),
+    onError: () => setErrorMsg("Erreur lors de la désactivation."),
   });
 
+  // ── Handlers ───────────────────────────────────────────────────────────────
   const openCreate = () => {
     setEditingPoste(null);
     setTitre("");
@@ -86,10 +97,7 @@ const AdminPostesPage = () => {
   };
 
   const handleSubmit = () => {
-    if (!titre.trim()) {
-      setErrorMsg("Le titre est obligatoire.");
-      return;
-    }
+    if (!titre.trim()) { setErrorMsg("Le titre est obligatoire."); return; }
     if (editingPoste) {
       updateMutation.mutate({ id: editingPoste.id, titre, description });
     } else {
@@ -97,8 +105,17 @@ const AdminPostesPage = () => {
     }
   };
 
+  const handleDeleteClick = (p: Position) => {
+    if (isOccupe(p.id)) {
+      setBlockedPosteId(p.id);
+    } else {
+      setDeleteConfirmId(p.id);
+    }
+  };
+
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-screen" style={{ background: "var(--bg)" }}>
       <Sidebar role={role as any} />
@@ -115,19 +132,15 @@ const AdminPostesPage = () => {
             <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
               {(positions as Position[]).length} poste{(positions as Position[]).length > 1 ? "s" : ""} configuré{(positions as Position[]).length > 1 ? "s" : ""}
             </p>
-            <a 
-              href="/admin/archives/postes" 
-      className="text-xs text-[#00AEEF] hover:underline mt-1 inline-flex items-center gap-1"
-    >
-      🗂️ Voir les postes archivés →
-    </a>
+            <a href="/admin/archives/postes"
+              className="text-xs text-[#00AEEF] hover:underline mt-1 inline-flex items-center gap-1">
+              🗂️ Voir les postes archivés →
+            </a>
           </div>
-          <button type="button"
-            onClick={openCreate}
+          <button type="button" onClick={openCreate}
             className="btn-primary flex items-center gap-2 px-5 py-2.5">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
             Nouveau poste
           </button>
@@ -161,73 +174,96 @@ const AdminPostesPage = () => {
             <div className="flex flex-col items-center justify-center py-20 gap-4"
               style={{ border: "2px dashed var(--border)", borderRadius: "24px" }}>
               <span className="text-6xl">💼</span>
-              <p className="text-lg font-semibold" style={{ color: "var(--text-muted)" }}>
-                Aucun poste configuré
-              </p>
+              <p className="text-lg font-semibold" style={{ color: "var(--text-muted)" }}>Aucun poste configuré</p>
               <button type="button" onClick={openCreate} className="btn-primary px-6 py-2.5">
                 Créer le premier poste
               </button>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
-              {(positions as Position[]).map((p, index) => (
-                <div key={p.id} className="card p-5 flex items-start gap-4 hover:shadow-md transition group">
-                  {/* Numéro */}
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-bold flex-shrink-0"
-                    style={{ background: "rgba(0,174,239,0.08)", color: "#00AEEF", border: "1px solid rgba(0,174,239,0.15)" }}>
-                    {String(index + 1).padStart(2, "0")}
-                  </div>
+              {(positions as Position[]).map((p, index) => {
+                const occupe   = isOccupe(p.id);
+                const nbSal    = getNbSalaries(p.id);
+                return (
+                  <div key={p.id} className="card p-5 flex items-start gap-4 hover:shadow-md transition group">
+                    {/* Numéro */}
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-bold flex-shrink-0"
+                      style={{ background: "rgba(0,174,239,0.08)", color: "#00AEEF", border: "1px solid rgba(0,174,239,0.15)" }}>
+                      {String(index + 1).padStart(2, "0")}
+                    </div>
 
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-base" style={{ color: "var(--text)", fontFamily: "Sora" }}>
-                      {p.titre}
-                    </h3>
-                    {p.description && (
-                      <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--text-muted)" }}>
-                        {p.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                        style={{ background: "rgba(141,198,63,0.1)", color: "#8DC63F", border: "1px solid rgba(141,198,63,0.2)" }}>
-                        ✓ Actif
-                      </span>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-base" style={{ color: "var(--text)", fontFamily: "Sora" }}>
+                        {p.titre}
+                      </h3>
+                      {p.description && (
+                        <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--text-muted)" }}>
+                          {p.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {/* Badge actif */}
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{ background: "rgba(141,198,63,0.1)", color: "#8DC63F", border: "1px solid rgba(141,198,63,0.2)" }}>
+                          ✓ Actif
+                        </span>
+                        {/* Badge occupé / libre */}
+                        {occupe ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1"
+                            style={{ background: "rgba(0,174,239,0.08)", color: "#00AEEF", border: "1px solid rgba(0,174,239,0.2)" }}>
+                            👥 {nbSal} salarié{nbSal > 1 ? "s" : ""} affecté{nbSal > 1 ? "s" : ""}
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                            style={{ background: "var(--bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
+                            Libre
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Modifier */}
+                      <button type="button"
+                        onClick={() => openEdit(p)}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center transition hover:scale-105"
+                        style={{ background: "rgba(0,174,239,0.08)", color: "#00AEEF" }}
+                        title="Modifier">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                      </button>
+
+                      {/* Désactiver — grisé si occupé */}
+                      <button type="button"
+                        onClick={() => handleDeleteClick(p)}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center transition"
+                        style={{
+                          background:  occupe ? "var(--bg)"  : "#fef2f2",
+                          color:       occupe ? "var(--text-muted)" : "#dc2626",
+                          cursor:      occupe ? "not-allowed" : "pointer",
+                          opacity:     occupe ? 0.5 : 1,
+                        }}
+                        title={occupe ? `Impossible : ${nbSal} salarié${nbSal > 1 ? "s" : ""} affecté${nbSal > 1 ? "s" : ""} à ce poste` : "Désactiver"}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="3 6 5 6 21 6"/>
+                          <path d="M19 6l-1 14H6L5 6"/>
+                          <path d="M10 11v6M14 11v6"/>
+                          <path d="M9 6V4h6v2"/>
+                        </svg>
+                      </button>
                     </div>
                   </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button type="button"
-                      onClick={() => openEdit(p)}
-                      className="w-9 h-9 rounded-xl flex items-center justify-center transition hover:scale-105"
-                      style={{ background: "rgba(0,174,239,0.08)", color: "#00AEEF" }}
-                      title="Modifier">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                      </svg>
-                    </button>
-                    <button type="button"
-                      onClick={() => setDeleteConfirmId(p.id)}
-                      className="w-9 h-9 rounded-xl flex items-center justify-center transition hover:scale-105"
-                      style={{ background: "#fef2f2", color: "#dc2626" }}
-                      title="Désactiver">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6l-1 14H6L5 6"/>
-                        <path d="M10 11v6M14 11v6"/>
-                        <path d="M9 6V4h6v2"/>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </main>
 
-      {/* Modal créer / modifier */}
+      {/* ── Modal créer / modifier ── */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60" onClick={closeModal} />
@@ -252,8 +288,7 @@ const AdminPostesPage = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold mb-2 uppercase tracking-wide"
-                  style={{ color: "var(--text-muted)" }}>
+                <label className="block text-xs font-bold mb-2 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
                   Titre du poste *
                 </label>
                 <input type="text" value={titre}
@@ -261,10 +296,8 @@ const AdminPostesPage = () => {
                   placeholder="Ex: Développeur logiciel"
                   className="input-field" />
               </div>
-
               <div>
-                <label className="block text-xs font-bold mb-2 uppercase tracking-wide"
-                  style={{ color: "var(--text-muted)" }}>
+                <label className="block text-xs font-bold mb-2 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
                   Description
                 </label>
                 <textarea value={description}
@@ -272,17 +305,14 @@ const AdminPostesPage = () => {
                   placeholder="Brève description du poste..."
                   rows={3} className="input-field" style={{ resize: "none" }} />
               </div>
-
               {errorMsg && (
                 <div className="px-4 py-3 rounded-xl text-xs"
                   style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
                   ⚠ {errorMsg}
                 </div>
               )}
-
               <div className="flex gap-3 pt-2">
-                <button type="button"
-                  onClick={handleSubmit}
+                <button type="button" onClick={handleSubmit}
                   disabled={isPending || !titre.trim()}
                   className="btn-primary flex-1 py-3">
                   {isPending ? (
@@ -301,7 +331,7 @@ const AdminPostesPage = () => {
         </div>
       )}
 
-      {/* Modal confirmation suppression */}
+      {/* ── Modal confirmation désactivation ── */}
       {deleteConfirmId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60" onClick={() => setDeleteConfirmId(null)} />
@@ -323,14 +353,44 @@ const AdminPostesPage = () => {
                   onClick={() => deleteMutation.mutate(deleteConfirmId)}
                   disabled={deleteMutation.isPending}
                   className="btn-danger flex-1 py-3">
-                  {deleteMutation.isPending ? "Suppression..." : "Oui, désactiver"}
+                  {deleteMutation.isPending ? "Désactivation..." : "Oui, désactiver"}
                 </button>
-                <button type="button"
-                  onClick={() => setDeleteConfirmId(null)}
-                  className="btn-secondary flex-1 py-3">
+                <button type="button" onClick={() => setDeleteConfirmId(null)} className="btn-secondary flex-1 py-3">
                   Annuler
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal blocage — poste occupé ── */}
+      {blockedPosteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setBlockedPosteId(null)} />
+          <div className="relative rounded-3xl shadow-2xl p-8 w-full mx-4"
+            style={{ background: "var(--surface)", maxWidth: "420px", zIndex: 51 }}>
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"
+                style={{ background: "rgba(0,174,239,0.08)", border: "1px solid rgba(0,174,239,0.2)" }}>
+                🔒
+              </div>
+              <h3 className="text-lg font-bold mb-2" style={{ color: "var(--text)", fontFamily: "Sora" }}>
+                Désactivation impossible
+              </h3>
+              <div className="rounded-2xl px-4 py-3 mb-5 text-sm"
+                style={{ background: "rgba(0,174,239,0.06)", border: "1px solid rgba(0,174,239,0.2)", color: "var(--text)" }}>
+                <p className="font-semibold mb-1" style={{ color: "#00AEEF" }}>
+                  👥 {getNbSalaries(blockedPosteId)} salarié{getNbSalaries(blockedPosteId) > 1 ? "s" : ""} affecté{getNbSalaries(blockedPosteId) > 1 ? "s" : ""} à ce poste
+                </p>
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Un poste ne peut être désactivé que lorsqu'aucun salarié ne lui est affecté.
+                  Réaffectez d'abord les salariés concernés à un autre poste.
+                </p>
+              </div>
+              <button type="button" onClick={() => setBlockedPosteId(null)} className="btn-primary w-full py-3">
+                Compris
+              </button>
             </div>
           </div>
         </div>

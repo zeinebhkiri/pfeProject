@@ -1,4 +1,4 @@
-import { useState, type JSX, useEffect } from "react";
+import { useState, type JSX, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getMyParcoursApi,
@@ -12,6 +12,8 @@ import {
   deleteTaskDocumentApi
 } from "../api/authApi";
 import { useAuth } from "../hooks/useAuth";
+import { useGamification, computeBadgesFromTasks, type Badge } from "../hooks/useGamification";
+import { BadgeUnlockToast } from "./Badgeunlocktoast";
 import { type Task, type TaskType, type Question } from "../types/auth";
 
 // ── Configs visuelles ──────────────────────────────────────────────────
@@ -123,8 +125,14 @@ const ParcoursWidget = ({ initialSelectedTaskId }: ParcoursWidgetProps) => {
     queryKey: ["currentUser"],
     queryFn: getCurrentUserApi,
   });
-    const currentUserId = currentUser?.id || userId;
+  const currentUserId = currentUser?.id || userId;
   const myTypeActeur = role === "MANAGER" ? "MANAGER" : role === "ADMIN" ? "RH" : "SALARIE";
+
+  // ── Gamification ──────────────────────────────────────────────────────────
+  const [pendingBadges, setPendingBadges] = useState<Badge[]>([]);
+  const [showBadgeToast, setShowBadgeToast] = useState(false);
+  // Snapshot des badges débloqués AVANT la complétion (pour comparer après refetch)
+  const prevUnlockedIdsRef = useRef<Set<string>>(new Set());
 
 
   // ── Mutations ─────────────────────────────────────────────────────
@@ -164,12 +172,48 @@ const ParcoursWidget = ({ initialSelectedTaskId }: ParcoursWidgetProps) => {
   });
 
   const completeMutation = useMutation({
-    mutationFn: completeTaskApi,
-    onSuccess: (updatedTask) => {
-      queryClient.invalidateQueries({ queryKey: ["myTasks"] });
-      queryClient.invalidateQueries({ queryKey: ["myParcours"] });
+    mutationFn: (taskId: string) => {
+      // Snapshot des badges actuellement débloqués AVANT la mutation
+      prevUnlockedIdsRef.current = new Set(
+        (tasks as Task[])
+          .filter(t => t.statut === "TERMINE")
+          .map(t => t.id)
+      );
+      return completeTaskApi(taskId);
+    },
+    onSuccess: async (updatedTask) => {
       setSelectedTask(updatedTask);
       setSuccessMsg("Tâche marquée comme terminée !");
+      // 1. Lire les badges déjà vus AVANT le refetch
+      const SEEN_KEY = "gamification_seen_badges";
+      let seenIdsBefore: string[] = [];
+      try { seenIdsBefore = JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]"); } catch {}
+      // 2. Refetch
+      await queryClient.invalidateQueries({ queryKey: ["myTasks"] });
+      await queryClient.invalidateQueries({ queryKey: ["myParcours"] });
+      // 3. Attendre que le cache soit mis à jour puis comparer
+      setTimeout(() => {
+        const freshTasks = queryClient.getQueryData<Task[]>(["myTasks"]) ?? [];
+        const freshParcours = queryClient.getQueryData<any>(["myParcours"]);
+        console.log("[BADGE] freshTasks count:", freshTasks.length);
+        console.log("[BADGE] seenIdsBefore:", seenIdsBefore);
+        const { unlockedBadges } = computeBadgesFromTasks(freshTasks, freshParcours);
+        console.log("[BADGE] unlockedBadges:", unlockedBadges.map(b => b.id));
+        const newBadges = unlockedBadges.filter(b => !seenIdsBefore.includes(b.id));
+        console.log("[BADGE] newBadges:", newBadges.map(b => b.id));
+        if (newBadges.length > 0) {
+          setPendingBadges(newBadges);
+          setShowBadgeToast(true);
+        } else {
+          // Force affichage pour test — tous les badges débloqués
+          const allUnlocked = unlockedBadges;
+          if (allUnlocked.length > 0) {
+            console.log("[BADGE] forcing toast with all unlocked badges");
+            setPendingBadges(allUnlocked);
+            setShowBadgeToast(true);
+          }
+        }
+      }, 800);
     },
   });
 
@@ -196,16 +240,25 @@ const ParcoursWidget = ({ initialSelectedTaskId }: ParcoursWidgetProps) => {
 
   // ── Helpers ───────────────────────────────────────────────────────
   const canActOnTask = (task: Task): boolean => {
-    const isAssignedToMe = currentUserId ? task.acteurIds?.includes(currentUserId) : false;
-    if (isAssignedToMe) return true;
-    return task.typeActeurs?.includes(myTypeActeur as any) ?? false;
+    // Toujours utiliser typeActeurs comme source principale
+    if (task.typeActeurs?.includes(myTypeActeur as any)) return true;
+    // Fallback : si acteurIds contient l'utilisateur courant
+    if (currentUserId && task.acteurIds && task.acteurIds.length > 0) {
+      return task.acteurIds.includes(currentUserId);
+    }
+    return false;
   };
 
   const myProgressionDone = (task: Task): boolean => {
-    if (!task.acteurProgressions || !task.acteurIds) return false;
-    const myIndex = task.acteurIds.findIndex(id => id === currentUserId);
-    if (myIndex === -1) return false;
-    return task.acteurProgressions[myIndex]?.complete ?? false;
+    if (!task.acteurProgressions) return false;
+    // Si acteurIds disponible → chercher par id
+    if (task.acteurIds && task.acteurIds.length > 0 && currentUserId) {
+      const myIndex = task.acteurIds.findIndex(id => id === currentUserId);
+      if (myIndex !== -1) return task.acteurProgressions[myIndex]?.complete ?? false;
+    }
+    // Fallback : chercher par typeActeur
+    const myProg = task.acteurProgressions.find(ap => ap.typeActeur === myTypeActeur);
+    return myProg?.complete ?? false;
   };
   const isQuizLocked = (task: Task): boolean => {
     if (task.taskType !== "QUIZ" || !task.dateOuverture) return false;
@@ -217,10 +270,10 @@ const ParcoursWidget = ({ initialSelectedTaskId }: ParcoursWidgetProps) => {
     return Math.ceil((new Date(task.dateOuverture).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   };
 
-    const canCompleteTask = (task: Task): boolean => {
-    const isAssignedToMe = currentUserId ? (task.acteurIds?.includes(currentUserId) ?? false) : false;
-    const notAlreadyCompleted = !myProgressionDone(task);
-    return isAssignedToMe && notAlreadyCompleted;
+  const canCompleteTask = (task: Task): boolean => {
+    if (task.statut === "TERMINE") return false;
+    if (myProgressionDone(task)) return false;
+    return canActOnTask(task);
   };
 
   // ── Handlers ──────────────────────────────────────────────────────
@@ -246,6 +299,7 @@ const ParcoursWidget = ({ initialSelectedTaskId }: ParcoursWidgetProps) => {
 
   // 🔥 Ouvrir automatiquement la tâche si initialSelectedTaskId est fourni
   const tasksList = tasks as Task[];
+  const { newlyUnlockedBadges, markBadgesSeen } = useGamification(tasksList, parcours ?? undefined);
   
   useEffect(() => {
     if (initialSelectedTaskId && tasksList.length > 0 && !selectedTask) {
@@ -1069,7 +1123,7 @@ const handleDeleteDocument = () => {
                       </p>
                       <div className="space-y-2">
                         {q.options.map((opt: string, oIndex: number) => (
-                          <label key={oIndex}
+                          <label key={`${qIndex}-${oIndex}`}
                             className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition"
                             style={{
                               background: quizReponses[qIndex] === oIndex ? "rgba(0,174,239,0.08)" : "var(--surface)",
@@ -1556,6 +1610,17 @@ const handleDeleteDocument = () => {
         .badge-pulse { animation: pulse-badge 1.4s ease-in-out infinite; }
         .badge-blink { animation: blink-badge 1s ease-in-out infinite; }
       `}</style>
+      {/* Badge unlock toast */}
+      {showBadgeToast && pendingBadges.length > 0 && (
+        <BadgeUnlockToast
+          badges={pendingBadges}
+          onAllDone={(ids) => {
+            markBadgesSeen(ids);
+            setShowBadgeToast(false);
+            setPendingBadges([]);
+          }}
+        />
+      )}
     </div>
   );
 };

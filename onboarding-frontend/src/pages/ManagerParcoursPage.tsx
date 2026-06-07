@@ -140,14 +140,22 @@ const [correctionTaskId, setCorrectionTaskId] = useState<string | null>(null);
       validateTaskApi(taskId, data),
     onSuccess: (updatedTask) => {
       queryClient.invalidateQueries({ queryKey: ["teamParcours"] });
+      queryClient.invalidateQueries({ queryKey: ["allParcours"] });
       setSelectedTask(updatedTask);
       setShowValidateModal(false);
       setValidateComment("");
       setSuccessMsg(validateApprouve ? "Tâche validée !" : "Tâche rejetée.");
       if (selectedMember) {
+        const updatedTasks = selectedMember.tasks.map(t => t.id === updatedTask.id ? updatedTask : t);
+        const doneCount = updatedTasks.filter(t => t.statut === "TERMINE").length;
+        const newProgression = updatedTasks.length > 0 ? Math.round((doneCount / updatedTasks.length) * 100) : 0;
+        const hasParcours = selectedMember.parcours && "id" in selectedMember.parcours;
         setSelectedMember({
           ...selectedMember,
-          tasks: selectedMember.tasks.map(t => t.id === updatedTask.id ? updatedTask : t),
+          tasks: updatedTasks,
+          parcours: hasParcours
+            ? { ...(selectedMember.parcours as Parcours), progression: newProgression }
+            : selectedMember.parcours,
         });
       }
     },

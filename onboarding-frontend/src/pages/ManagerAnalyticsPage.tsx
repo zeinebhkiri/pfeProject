@@ -771,6 +771,7 @@ const ManagerAnalyticsPage = () => {
               </div>
             </div>
             <div style={{ overflowX:"auto" }}>
+              <div className="table-responsive"> 
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom:`1px solid ${C.border}`, background:C.bg }}>
@@ -876,6 +877,7 @@ const ManagerAnalyticsPage = () => {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
 
@@ -904,7 +906,7 @@ const ManagerAnalyticsPage = () => {
             ) : (
               <div className="space-y-6">
                 {/* KPI Row */}
-                <div className="grid grid-cols-4 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
                   {[
                     { icon: "📊", label: "Évaluations reçues", value: feedbackStats.total, sub: "questionnaires soumis", color: C.cyan, bg: "#e0f7ff", suffix: "" },
                     { icon: "😊", label: "Taux de satisfaction", value: feedbackStats.tauxSatisfactionGlobale, sub: "salariés satisfaits", color: C.green, bg: "#f0fdf4", suffix: "%" },
@@ -925,7 +927,7 @@ const ManagerAnalyticsPage = () => {
                 </div>
 
                 {/* Scores moyens */}
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6">
                   <div className="card p-6">
                     <h2 className="text-lg font-bold mb-1" style={{ color: C.text, fontFamily: "Sora" }}>Scores moyens</h2>
                     <p className="text-sm mb-5" style={{ color: C.muted }}>Par dimension évaluée (sur 4)</p>

@@ -7,6 +7,7 @@ import Sidebar from "../components/Sidebar";
 import type { Task } from "../types/auth";
 import TopNav from "../components/TopNav";
 import CompanyDocumentsWidget from "../components/CompanyDocumentsWidget";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
 // ── Helper échéances ─────────────────────────────────────────────────────
 const getEcheanceInfo = (echeance?: string, statut?: string) => {
@@ -418,10 +419,11 @@ const PendingAccountView = ({ user, onRefresh }: { user: any; onRefresh: () => v
 
 // ── Composant principal ──────────────────────────────────────────────────
 const DashboardPage = () => {
+  
   const navigate = useNavigate();
   const { role } = useAuth();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-
+  const { menuOpen, openMenu, closeMenu } = useResponsiveLayout();
   const handleTaskClick = (task: Task) => {
     sessionStorage.setItem("parcours_selected_task", task.id);
     navigate("/parcours");
@@ -483,9 +485,9 @@ const DashboardPage = () => {
   if (!isAccountValidated) {
     return (
       <div className="flex min-h-screen" style={{ background: "#F8FAFC" }}>
-        <Sidebar role={role as any} />
-        <main className="flex-1 overflow-auto" style={{ marginLeft: "var(--sidebar-w)" }}>
-          <TopNav showSearch={false} />
+        <Sidebar role="SALARIE" mobileOpen={menuOpen} onClose={closeMenu} />
+        <main className="flex-1 overflow-auto" >
+          <TopNav showSearch={false} onMenuOpen={openMenu} />
           <div className="p-6 lg:p-8">
             <PendingAccountView user={user} onRefresh={handleRefresh} />
           </div>
@@ -497,10 +499,10 @@ const DashboardPage = () => {
   // AFFICHAGE POUR COMPTE VALIDÉ (dashboard normal)
   return (
     <div className="flex min-h-screen" style={{ background: "#F8FAFC" }}>
-      <Sidebar role={role as any} />
+      <Sidebar role={role as any}  mobileOpen={menuOpen} onClose={closeMenu}/>
 
       <main className="flex-1 overflow-auto" style={{ marginLeft: "var(--sidebar-w)" }}>
-        <TopNav showSearch={false} />
+        <TopNav showSearch={false} onMenuOpen={openMenu} />
 
         <div className="p-6 lg:p-8">
           

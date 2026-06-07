@@ -17,6 +17,7 @@ import {
   type ParcoursAvecTasks,
 } from "../types/auth";
 import { type Affectation } from "../types/auth";
+import { type ArchiveParcours, type EligibiliteChangementPoste } from "../types/auth";
 
 
 const API_BASE = "http://localhost:8080/api";
@@ -525,5 +526,51 @@ export const getAllFeedbacksApi = async (): Promise<any[]> => {
 
 export const getFeedbackStatisticsApi = async (): Promise<any> => {
   const res = await api.get("/feedback/statistics");
+  return res.data;
+};
+
+// ─── Changement de poste ──────────────────────────────────────────────────────
+
+export const verifierEligibiliteChangementPosteApi = async (
+  userId: string
+): Promise<EligibiliteChangementPoste> => {
+  const res = await api.get<EligibiliteChangementPoste>(
+    `/affectations/change-poste/eligibilite/${userId}`
+  );
+  return res.data;
+};
+
+export const changePosteApi = async (data: {
+  userId: string;
+  nouveauPositionId: string;
+  nouveauManagerId?: string;
+  nouveauDatePriseDePoste?: string;
+  motif?: string;
+}): Promise<{ message: string; affectation: Affectation }> => {
+  const res = await api.post("/affectations/change-poste", data);
+  return res.data;
+};
+
+export const getHistoriquePostesApi = async (
+  userId: string
+): Promise<ArchiveParcours[]> => {
+  const res = await api.get<ArchiveParcours[]>(`/affectations/historique/${userId}`);
+  return res.data;
+};
+
+// ─── Propagation template → salariés ─────────────────────────────────────────
+
+export const getTemplatesSalariesActifsApi = async (
+  templateId: string
+): Promise<{ userId: string; prenom: string; nom: string; email: string; parcoursId: string; progression: number }[]> => {
+  const res = await api.get(`/parcours-templates/${templateId}/salaries-actifs`);
+  return res.data;
+};
+
+export const applyTemplateToUsersApi = async (
+  templateId: string,
+  userIds: string[]
+): Promise<{ message: string; applied: number; errors: string[] }> => {
+  const res = await api.post(`/parcours-templates/${templateId}/apply-to-users`, { userIds });
   return res.data;
 };
